@@ -1,0 +1,71 @@
+version: "1.0"
+
+project:
+  name: "local-doc-ai"
+  description: "AI assistant using local documents only"
+
+server:
+  type: "mcp"
+  runtime: "node"
+  port: 3000
+
+knowledge_base:
+  sources:
+    - type: "local_files"
+      name: "docs"
+      config:
+        path: "./docs"
+        file_types:
+          - ".txt"
+          - ".md"
+          - ".pdf"
+
+  ingestion:
+    chunk_size: 500
+    chunk_overlap: 100
+    encoding: "utf-8"
+
+
+retrieval:
+  top_k: 3
+  method: "semantic"
+
+tools:
+  - name: "search_docs"
+    description: "Search local documents for relevant information"
+    input_schema:
+      type: object
+      properties:
+        query:
+          type: string
+      required: ["query"]
+
+  - name: "get_document"
+    description: "Get full document content by file name"
+    input_schema:
+      type: object
+      properties:
+        filename:
+          type: string
+      required: ["filename"]
+
+  - name: "update_document"
+    description: "Update document content by file name"
+    input_schema:
+      type: object
+      properties:
+        filename:
+          type: string
+        content:
+          type: string
+      required: ["filename", "content"]
+
+models:
+  default: "gpt-4.1-mini"
+  temperature: 0.2
+
+logging:
+  level: "info"
+
+deployment:
+  environment: "local"
