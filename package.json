@@ -1,0 +1,33 @@
+{
+  "name": "local-doc-ai-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for local document search (local-doc-ai)",
+  "type": "module",
+  "bin": {
+    "local-doc-ai-mcp": "./build/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node build/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "build"
+  ],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "pdf-parse": "^2.4.5",
+    "yaml": "^2.8.3",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.17",
+    "@types/pdf-parse": "^1.1.5",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.4"
+  }
+}
