@@ -1,24 +1,28 @@
-Ant Group is one of the world’s largest financial technology (fintech) companies. It originated as the financial arm of Alibaba Group and focuses on digital payments, banking services, and financial infrastructure.
+# Introduction to Photosynthesis
 
-🧾 What Ant Group actually does
+## What is Photosynthesis?
+Photosynthesis is the process by which green plants, algae, and some bacteria convert light energy into chemical energy.
 
-At its core, Ant Group builds technology for moving and managing money. Its services include:
+## Key Ingredients
+- Sunlight: The energy source
+- Carbon Dioxide (CO2): Taken from the air
+- Water (H2O): Absorbed from the soil
 
-Digital payments (mobile wallets, QR payments)
-Online lending & credit scoring
-Wealth management
-Insurance services
-Financial infrastructure for banks and businesses
-📱 Its most famous product: Alipay
+## Main Product
+- Glucose (C6H12O6): A type of sugar used for energy
+- Oxygen (O2): Released as a byproduct
 
-Ant Group operates Alipay, one of the largest mobile payment apps in the world.
+## Where It Happens
+Photosynthesis occurs in the chloroplasts of plant cells, specifically using chlorophyll (the green pigment).
 
-With Alipay, users can:
+## The Equation
+6 CO2 + 6 H2O + light energy → C6H12O6 + 6 O2
 
-Pay in stores using QR codes
-Send money instantly
-Pay bills and utilities
-Invest in funds
-Access loans and insurance
+## Two Stages
+1. Light-dependent reactions (require sunlight)
+2. Light-independent reactions (Calvin Cycle)
 
-In China, Alipay is as essential as cash or cards—many people rarely use physical money anymore.
+## Importance
+- Produces oxygen for living organisms
+- Forms the base of most food chains
+- Reduces carbon dioxide in the atmosphere

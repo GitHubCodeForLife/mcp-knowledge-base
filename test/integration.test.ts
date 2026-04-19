@@ -5,6 +5,7 @@ import { loadConfig } from "../src/config/loadConfig.js";
 import { createHashEmbedder } from "../src/embeddings/embedder.js";
 import { buildCorpus } from "../src/ingestion/buildCorpus.js";
 import { resolveDocumentPath } from "../src/paths/resolveDocument.js";
+import { retrieveRankedWithOptions } from "../src/search/hybridRetriever.js";
 import { buildVectorIndex } from "../src/search/vectorIndex.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -36,5 +37,32 @@ describe("integration", () => {
     const hits = index.search(q, cfg.retrieval.top_k);
     expect(hits.length).toBeGreaterThan(0);
     expect(hits[0].relativePath).toContain("alpha");
+  });
+
+  it("retrieveRankedWithOptions matches legacy semantic ranking when method is semantic", async () => {
+    const cfg = loadConfig(fixtureRoot);
+    const corpus = await buildCorpus(cfg);
+    const embedder = createHashEmbedder();
+    const index = await buildVectorIndex(
+      corpus.map((c) => ({
+        id: c.id,
+        relativePath: c.relativePath,
+        chunkIndex: c.chunkIndex,
+        text: c.text,
+      })),
+      embedder,
+    );
+    const qText = "bananas yellow";
+    const q = await embedder.embedQuery(qText);
+    const newHits = retrieveRankedWithOptions(
+      index,
+      null,
+      cfg,
+      qText,
+      q,
+      {},
+    );
+    const oldHits = index.search(q, cfg.retrieval.top_k);
+    expect(newHits.map((h) => h.id)).toEqual(oldHits.map((h) => h.id));
   });
 });
