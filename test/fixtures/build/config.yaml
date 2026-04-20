@@ -1,0 +1,58 @@
+version: "1.0"
+
+project:
+  name: "fixture-local-doc-ai"
+  description: "Test fixture"
+
+server:
+  type: "mcp"
+  runtime: "node"
+  port: 3000
+
+knowledge_base:
+  sources:
+    - type: "local_files"
+      name: "docs"
+      config:
+        path: "./docs"
+        file_types:
+          - ".txt"
+          - ".md"
+
+  ingestion:
+    chunk_size: 200
+    chunk_overlap: 40
+    encoding: "utf-8"
+
+retrieval:
+  top_k: 2
+  method: "semantic"
+
+tools:
+  - name: "search_docs"
+    description: "Search"
+    input_schema:
+      type: object
+      properties:
+        query:
+          type: string
+      required: ["query"]
+
+  - name: "get_document"
+    description: "Get doc"
+    input_schema:
+      type: object
+      properties:
+        filename:
+          type: string
+      required: ["filename"]
+
+models:
+  default: "gpt-4.1-mini"
+  temperature: 0.2
+
+logging:
+  level: "info"
+
+deployment:
+  environment: "local"

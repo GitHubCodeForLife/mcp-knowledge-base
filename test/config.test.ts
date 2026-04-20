@@ -21,4 +21,11 @@ describe("loadConfig", () => {
     expect(cfg.configPath).toBe(customPath);
     delete process.env.LOCAL_DOC_AI_CONFIG;
   });
+
+  it("rejects candidate_pool smaller than top_k", () => {
+    const badPath = path.join(fixtureRoot, "invalid-retrieval.yaml");
+    process.env.LOCAL_DOC_AI_CONFIG = badPath;
+    expect(() => loadConfig(fixtureRoot)).toThrow(/candidate_pool/);
+    delete process.env.LOCAL_DOC_AI_CONFIG;
+  });
 });

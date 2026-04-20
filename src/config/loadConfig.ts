@@ -33,7 +33,27 @@ const RawConfigSchema = z.object({
   }),
   retrieval: z.object({
     top_k: z.number(),
-    method: z.enum(["semantic"]),
+    method: z.enum(["semantic", "hybrid"]),
+    hybrid: z
+      .object({
+        dense_weight: z.number(),
+        lexical_weight: z.number(),
+      })
+      .optional(),
+    candidate_pool: z.number().optional(),
+    mmr: z
+      .object({
+        enabled: z.boolean(),
+        lambda: z.number(),
+      })
+      .optional(),
+    verbose_hits_default: z.boolean().optional(),
+    multi_query_tool: z
+      .object({
+        enabled: z.boolean(),
+        name: z.string().min(1).optional(),
+      })
+      .optional(),
   }),
   tools: z.array(
     z.object({
@@ -68,6 +88,35 @@ export type AppConfig = z.infer<typeof RawConfigSchema> & {
   }>;
 };
 
+function validateRetrievalConsistency(
+  retrieval: z.infer<typeof RawConfigSchema>["retrieval"],
+  configPath: string,
+): void {
+  const wd = retrieval.hybrid?.dense_weight ?? 0.5;
+  const wl = retrieval.hybrid?.lexical_weight ?? 0.5;
+  if (retrieval.method === "hybrid" && wd + wl <= 0) {
+    throw new Error(
+      `Invalid config (${configPath}): retrieval.hybrid dense_weight + lexical_weight must be > 0`,
+    );
+  }
+  if (
+    retrieval.candidate_pool !== undefined &&
+    retrieval.candidate_pool < retrieval.top_k
+  ) {
+    throw new Error(
+      `Invalid config (${configPath}): retrieval.candidate_pool must be >= retrieval.top_k`,
+    );
+  }
+  if (retrieval.mmr !== undefined) {
+    const { lambda } = retrieval.mmr;
+    if (lambda < 0 || lambda > 1) {
+      throw new Error(
+        `Invalid config (${configPath}): retrieval.mmr.lambda must be between 0 and 1`,
+      );
+    }
+  }
+}
+
 function resolveConfigPath(projectRoot: string): string {
   const override = process.env.LOCAL_DOC_AI_CONFIG;
   if (override) {
@@ -91,6 +140,7 @@ export function loadConfig(projectRoot: string = process.cwd()): AppConfig {
     );
   }
   const data = parsed.data;
+  validateRetrievalConsistency(data.retrieval, configPath);
   const resolvedSources = data.knowledge_base.sources.map((s) => {
     const rel = s.config.path;
     const absolutePath = path.resolve(projectRoot, rel);

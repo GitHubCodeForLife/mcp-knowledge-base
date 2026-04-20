@@ -6,6 +6,7 @@ import { loadConfig } from "./config/loadConfig.js";
 import { createEmbedderFromEnv } from "./embeddings/embedder.js";
 import { buildCorpus } from "./ingestion/buildCorpus.js";
 import { registerLocalDocTools } from "./mcp/registerTools.js";
+import { Bm25Index } from "./search/bm25Index.js";
 import { buildVectorIndex } from "./search/vectorIndex.js";
 
 function logInfo(message: string): void {
@@ -43,12 +44,22 @@ async function main(): Promise<void> {
     embedder,
   );
 
+  const bm25 =
+    config.retrieval.method === "hybrid"
+      ? Bm25Index.fromChunks(
+          corpus.map((c) => ({ id: c.id, text: c.text })),
+        )
+      : null;
+  if (config.retrieval.method === "hybrid" && bm25 !== null) {
+    logInfo(`BM25 lexical index: ${bm25.docCount} chunks.`);
+  }
+
   const server = new McpServer({
     name: config.project.name,
     version: "1.0.0",
   });
 
-  registerLocalDocTools(server, { config, index, embedder });
+  registerLocalDocTools(server, { config, index, bm25, embedder });
 
   const transport = new StdioServerTransport();
   await server.connect(transport);

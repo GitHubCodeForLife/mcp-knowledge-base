@@ -1,0 +1,50 @@
+version: "1.0"
+
+project:
+  name: "bad"
+  description: "x"
+
+server:
+  type: "mcp"
+  runtime: "node"
+
+knowledge_base:
+  sources:
+    - type: "local_files"
+      name: "docs"
+      config:
+        path: "./docs"
+        file_types:
+          - ".md"
+
+  ingestion:
+    chunk_size: 200
+    chunk_overlap: 40
+    encoding: "utf-8"
+
+retrieval:
+  top_k: 5
+  method: "semantic"
+  candidate_pool: 1
+
+tools:
+  - name: "search_docs"
+    description: "Search"
+    input_schema:
+      type: object
+      properties:
+        query:
+          type: string
+      required: ["query"]
+
+  - name: "get_document"
+    description: "Get doc"
+    input_schema:
+      type: object
+      properties:
+        filename:
+          type: string
+      required: ["filename"]
+
+logging:
+  level: "info"

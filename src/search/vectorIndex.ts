@@ -37,6 +37,22 @@ export class VectorIndex {
     scored.sort((a, b) => b.score - a.score);
     return scored.slice(0, topK);
   }
+
+  /** Dense cosine score for every chunk (for hybrid / MMR candidate pools). */
+  allDenseScores(queryEmbedding: number[]): Array<ChunkRecord & { score: number }> {
+    return this.chunks.map((c) => ({
+      ...c,
+      score: cosine(queryEmbedding, c.embedding),
+    }));
+  }
+
+  getChunkById(id: string): ChunkRecord | undefined {
+    return this.chunks.find((c) => c.id === id);
+  }
+
+  get chunkCount(): number {
+    return this.chunks.length;
+  }
 }
 
 export async function buildVectorIndex(
