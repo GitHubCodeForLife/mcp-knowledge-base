@@ -15,7 +15,7 @@ describe("integration", () => {
   it("resolves documents and rejects traversal", () => {
     const cfg = loadConfig(fixtureRoot);
     const a = resolveDocumentPath(cfg, "alpha.md");
-    expect(a.relativePath).toMatch(/alpha\.md/);
+    expect(a.relativePath).toBe("docs/alpha.md");
     expect(() => resolveDocumentPath(cfg, "../outside.txt")).toThrow(/traversal/);
   });
 
@@ -36,7 +36,7 @@ describe("integration", () => {
     const q = await embedder.embedQuery("bananas yellow");
     const hits = index.search(q, cfg.retrieval.top_k);
     expect(hits.length).toBeGreaterThan(0);
-    expect(hits[0].relativePath).toContain("alpha");
+    expect(hits[0].relativePath).toContain("docs/alpha");
   });
 
   it("retrieveRankedWithOptions matches legacy semantic ranking when method is semantic", async () => {

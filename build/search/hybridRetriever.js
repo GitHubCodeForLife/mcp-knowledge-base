@@ -1,4 +1,8 @@
 import { matchesPathPrefix, normalizePathPrefix } from "../paths/pathPrefix.js";
+function isWikiHit(config, relativePath) {
+    const wikiMount = config.knowledge_base.layers?.wiki_source ?? "wiki";
+    return relativePath === wikiMount || relativePath.startsWith(`${wikiMount}/`);
+}
 function minMaxMap(m) {
     const out = new Map();
     if (m.size === 0)
@@ -129,6 +133,13 @@ export function retrieveFusedRankedUnbounded(index, bm25, config, queryText, que
     const denseList = index.allDenseScores(queryEmbedding);
     const fused = buildFusionMaps(denseList, bm25, queryText, method, weights);
     const ranked = [...fused.values()].filter((h) => matchesPathPrefix(h.relativePath, pathPrefix));
+    if (config.retrieval.wiki_first) {
+        for (const h of ranked) {
+            if (isWikiHit(config, h.relativePath)) {
+                h.fusionScore += 1;
+            }
+        }
+    }
     ranked.sort((a, b) => b.fusionScore - a.fusionScore);
     return ranked;
 }

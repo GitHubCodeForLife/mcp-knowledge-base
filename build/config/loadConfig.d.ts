@@ -66,6 +66,16 @@ declare const RawConfigSchema: z.ZodObject<{
             chunk_overlap: number;
             encoding: string;
         }>;
+        layers: z.ZodOptional<z.ZodObject<{
+            raw_source: z.ZodOptional<z.ZodString>;
+            wiki_source: z.ZodOptional<z.ZodString>;
+        }, "strip", z.ZodTypeAny, {
+            raw_source?: string | undefined;
+            wiki_source?: string | undefined;
+        }, {
+            raw_source?: string | undefined;
+            wiki_source?: string | undefined;
+        }>>;
     }, "strip", z.ZodTypeAny, {
         sources: {
             type: "local_files";
@@ -80,6 +90,10 @@ declare const RawConfigSchema: z.ZodObject<{
             chunk_overlap: number;
             encoding: string;
         };
+        layers?: {
+            raw_source?: string | undefined;
+            wiki_source?: string | undefined;
+        } | undefined;
     }, {
         sources: {
             type: "local_files";
@@ -94,6 +108,10 @@ declare const RawConfigSchema: z.ZodObject<{
             chunk_overlap: number;
             encoding: string;
         };
+        layers?: {
+            raw_source?: string | undefined;
+            wiki_source?: string | undefined;
+        } | undefined;
     }>;
     retrieval: z.ZodObject<{
         top_k: z.ZodNumber;
@@ -120,6 +138,7 @@ declare const RawConfigSchema: z.ZodObject<{
             lambda: number;
         }>>;
         verbose_hits_default: z.ZodOptional<z.ZodBoolean>;
+        wiki_first: z.ZodOptional<z.ZodBoolean>;
         multi_query_tool: z.ZodOptional<z.ZodObject<{
             enabled: z.ZodBoolean;
             name: z.ZodOptional<z.ZodString>;
@@ -143,6 +162,7 @@ declare const RawConfigSchema: z.ZodObject<{
             lambda: number;
         } | undefined;
         verbose_hits_default?: boolean | undefined;
+        wiki_first?: boolean | undefined;
         multi_query_tool?: {
             enabled: boolean;
             name?: string | undefined;
@@ -160,6 +180,7 @@ declare const RawConfigSchema: z.ZodObject<{
             lambda: number;
         } | undefined;
         verbose_hits_default?: boolean | undefined;
+        wiki_first?: boolean | undefined;
         multi_query_tool?: {
             enabled: boolean;
             name?: string | undefined;
@@ -227,6 +248,10 @@ declare const RawConfigSchema: z.ZodObject<{
             chunk_overlap: number;
             encoding: string;
         };
+        layers?: {
+            raw_source?: string | undefined;
+            wiki_source?: string | undefined;
+        } | undefined;
     };
     retrieval: {
         top_k: number;
@@ -241,6 +266,7 @@ declare const RawConfigSchema: z.ZodObject<{
             lambda: number;
         } | undefined;
         verbose_hits_default?: boolean | undefined;
+        wiki_first?: boolean | undefined;
         multi_query_tool?: {
             enabled: boolean;
             name?: string | undefined;
@@ -286,6 +312,10 @@ declare const RawConfigSchema: z.ZodObject<{
             chunk_overlap: number;
             encoding: string;
         };
+        layers?: {
+            raw_source?: string | undefined;
+            wiki_source?: string | undefined;
+        } | undefined;
     };
     retrieval: {
         top_k: number;
@@ -300,6 +330,7 @@ declare const RawConfigSchema: z.ZodObject<{
             lambda: number;
         } | undefined;
         verbose_hits_default?: boolean | undefined;
+        wiki_first?: boolean | undefined;
         multi_query_tool?: {
             enabled: boolean;
             name?: string | undefined;

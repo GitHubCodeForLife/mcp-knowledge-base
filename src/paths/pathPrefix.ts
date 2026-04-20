@@ -16,6 +16,7 @@ export function normalizePathPrefix(prefix: string | undefined): string | undefi
   if (segments.some((s) => s === "..")) {
     throw new Error("Path traversal is not allowed in path_prefix");
   }
+  if (segments.length === 0) return undefined;
   return segments.join("/");
 }
 

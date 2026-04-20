@@ -31,10 +31,8 @@ export function resolveDocumentPath(
     const rel = path.relative(root.absolutePath, candidate);
     if (rel.startsWith("..") || path.isAbsolute(rel)) continue;
     if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
-      const relativePath = path
-        .relative(root.absolutePath, candidate)
-        .split(path.sep)
-        .join("/");
+      const inner = path.relative(root.absolutePath, candidate).split(path.sep).join("/");
+      const relativePath = `${root.name}/${inner}`;
       return { absolutePath: candidate, relativePath };
     }
   }
@@ -49,7 +47,7 @@ export function resolveDocumentPath(
   }
   if (matches.length > 1) {
     throw new Error(
-      `Filename "${base}" is ambiguous; use a path relative to the docs folder (e.g. "${matches[0].relativePath}").`,
+      `Filename "${base}" is ambiguous; use a path relative to a configured source mount (e.g. "${matches[0].relativePath}").`,
     );
   }
 

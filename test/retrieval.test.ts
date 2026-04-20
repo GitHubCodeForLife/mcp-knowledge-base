@@ -122,4 +122,35 @@ describe("BM25 and hybrid retrieval", () => {
     );
     expect(ranked.length).toBeLessThanOrEqual(cfg.retrieval.top_k);
   });
+
+  it("prefers wiki hits when wiki_first is enabled and wiki mount exists", async () => {
+    const base = loadConfig(fixtureRoot);
+    const cfg: AppConfig = {
+      ...base,
+      knowledge_base: {
+        ...base.knowledge_base,
+        layers: { wiki_source: "wiki", raw_source: "raw" },
+      },
+      retrieval: {
+        ...base.retrieval,
+        wiki_first: true,
+      },
+    };
+    const corpus = await buildCorpus(cfg);
+    const embedder = createHashEmbedder();
+    const index = await buildVectorIndex(
+      corpus.map((c) => ({
+        id: c.id,
+        relativePath: c.relativePath,
+        chunkIndex: c.chunkIndex,
+        text: c.text,
+      })),
+      embedder,
+    );
+    const q = "bananas";
+    const emb = await embedder.embedQuery(q);
+    const hits = retrieveFusedRankedUnbounded(index, null, cfg, q, emb, {});
+    expect(hits.length).toBeGreaterThan(0);
+    expect(hits[0].relativePath.startsWith("wiki/")).toBe(true);
+  });
 });
