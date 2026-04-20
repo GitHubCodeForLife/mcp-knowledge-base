@@ -52,6 +52,14 @@ On Windows you can use forward slashes in JSON. Restart the client after editing
 - Indexed roots and extensions come from `knowledge_base.sources` (this repo defaults to `./docs` with `.txt`, `.md`, `.pdf`).
 - Sample content: `docs/sample.md` (mentions **bananas** for quick search checks).
 
+## LLM Wiki
+
+This repo also supports a persistent wiki layer under `wiki/` fed by immutable sources under `raw/`. See `docs/llm-wiki.md`.
+
+### Archive reference
+
+Completed OpenSpec changes are kept under `openspec/changes/archive/` (for example `openspec/changes/archive/2026-04-19-implement-local-doc-ai-mcp/`).
+
 ### Expected `search_docs` behavior
 
 - With **`OPENAI_API_KEY`**, queries use semantic similarity over chunked text.

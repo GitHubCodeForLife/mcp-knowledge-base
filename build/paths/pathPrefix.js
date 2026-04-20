@@ -18,6 +18,8 @@ export function normalizePathPrefix(prefix) {
     if (segments.some((s) => s === "..")) {
         throw new Error("Path traversal is not allowed in path_prefix");
     }
+    if (segments.length === 0)
+        return undefined;
     return segments.join("/");
 }
 export function matchesPathPrefix(relativePath, prefix) {

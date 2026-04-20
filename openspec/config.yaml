@@ -1,0 +1,86 @@
+version: "1.0"
+
+project:
+  name: "local-doc-ai"
+  description: "AI assistant using local documents and a persistent wiki layer"
+
+server:
+  type: "mcp"
+  runtime: "node"
+
+knowledge_base:
+  # Each source is mounted by its name. Returned `relativePath` values will be
+  # prefixed with the source name (e.g. `wiki/index.md`, `raw/...`).
+  sources:
+    - type: "local_files"
+      name: "docs"
+      config:
+        path: "./docs"
+        file_types: [".txt", ".md", ".pdf"]
+    - type: "local_files"
+      name: "raw"
+      config:
+        path: "./raw"
+        file_types: [".txt", ".md", ".pdf"]
+    - type: "local_files"
+      name: "wiki"
+      config:
+        path: "./wiki"
+        file_types: [".txt", ".md"]
+
+  layers:
+    raw_source: "raw"
+    wiki_source: "wiki"
+
+  ingestion:
+    chunk_size: 500
+    chunk_overlap: 100
+    encoding: "utf-8"
+
+retrieval:
+  top_k: 3
+  method: "semantic"
+  wiki_first: true
+  hybrid:
+    dense_weight: 0.6
+    lexical_weight: 0.4
+  candidate_pool: 12
+  mmr:
+    enabled: false
+    lambda: 0.5
+  verbose_hits_default: false
+  multi_query_tool:
+    enabled: false
+    name: "search_docs_multi"
+
+tools:
+  - name: "search_docs"
+    description: "Search documents (wiki-first when enabled in config)"
+    input_schema:
+      type: object
+      properties:
+        query:
+          type: string
+      required: ["query"]
+  - name: "get_document"
+    description: "Get full document content by file name"
+    input_schema:
+      type: object
+      properties:
+        filename:
+          type: string
+      required: ["filename"]
+  - name: "update_document"
+    description: "Update document content by file name (wiki-only; raw is immutable)"
+    input_schema:
+      type: object
+      properties:
+        filename:
+          type: string
+        content:
+          type: string
+      required: ["filename", "content"]
+
+logging:
+  level: "info"
+

@@ -30,6 +30,12 @@ const RawConfigSchema = z.object({
       chunk_overlap: z.number(),
       encoding: z.string(),
     }),
+    layers: z
+      .object({
+        raw_source: z.string().min(1).optional(),
+        wiki_source: z.string().min(1).optional(),
+      })
+      .optional(),
   }),
   retrieval: z.object({
     top_k: z.number(),
@@ -48,6 +54,7 @@ const RawConfigSchema = z.object({
       })
       .optional(),
     verbose_hits_default: z.boolean().optional(),
+    wiki_first: z.boolean().optional(),
     multi_query_tool: z
       .object({
         enabled: z.boolean(),
@@ -124,6 +131,8 @@ function resolveConfigPath(projectRoot: string): string {
       ? override
       : path.resolve(projectRoot, override);
   }
+  const preferred = path.join(projectRoot, "openspec", "config.yaml");
+  if (fs.existsSync(preferred)) return preferred;
   return path.join(projectRoot, "build", "config.yaml");
 }
 

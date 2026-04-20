@@ -18,6 +18,19 @@ knowledge_base:
         file_types:
           - ".txt"
           - ".md"
+    - type: "local_files"
+      name: "raw"
+      config:
+        path: "./raw"
+        file_types:
+          - ".txt"
+          - ".md"
+    - type: "local_files"
+      name: "wiki"
+      config:
+        path: "./wiki"
+        file_types:
+          - ".md"
 
   ingestion:
     chunk_size: 200

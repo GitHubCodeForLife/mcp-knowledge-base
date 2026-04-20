@@ -11,6 +11,11 @@ export interface RankedHit extends ChunkRecord {
   retrievalMethod: "semantic" | "hybrid";
 }
 
+function isWikiHit(config: AppConfig, relativePath: string): boolean {
+  const wikiMount = config.knowledge_base.layers?.wiki_source ?? "wiki";
+  return relativePath === wikiMount || relativePath.startsWith(`${wikiMount}/`);
+}
+
 function minMaxMap(m: Map<string, number>): Map<string, number> {
   const out = new Map<string, number>();
   if (m.size === 0) return out;
@@ -184,6 +189,13 @@ export function retrieveFusedRankedUnbounded(
   const ranked = [...fused.values()].filter((h) =>
     matchesPathPrefix(h.relativePath, pathPrefix),
   );
+  if (config.retrieval.wiki_first) {
+    for (const h of ranked) {
+      if (isWikiHit(config, h.relativePath)) {
+        h.fusionScore += 1;
+      }
+    }
+  }
   ranked.sort((a, b) => b.fusionScore - a.fusionScore);
   return ranked;
 }
