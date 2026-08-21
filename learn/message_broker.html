@@ -1,0 +1,1921 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Service A → Kafka → Service B | Failure Handling</title>
+
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: #11182b;
+      --panel-2: #172039;
+      --border: #263352;
+      --text: #e8edf7;
+      --muted: #9aa8c7;
+      --primary: #6ea8fe;
+      --success: #48d597;
+      --warning: #f4c95d;
+      --danger: #ff6b7a;
+      --purple: #b58cff;
+      --cyan: #4dd8e8;
+      --shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+      --radius: 16px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      font-family:
+        Inter,
+        ui-sans-serif,
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif;
+      background:
+        radial-gradient(circle at top left, #162448 0, transparent 35%),
+        var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    code,
+    pre {
+      font-family:
+        "SFMono-Regular",
+        Consolas,
+        "Liberation Mono",
+        Menlo,
+        monospace;
+    }
+
+    .container {
+      width: min(1400px, calc(100% - 40px));
+      margin: auto;
+    }
+
+    header {
+      padding: 70px 0 45px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .badge {
+      display: inline-flex;
+      padding: 6px 12px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      color: var(--cyan);
+      background: rgba(77, 216, 232, 0.08);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+
+    h1 {
+      margin: 18px 0 10px;
+      font-size: clamp(38px, 6vw, 70px);
+      line-height: 1.05;
+      letter-spacing: -0.04em;
+    }
+
+    h2 {
+      margin-top: 0;
+      font-size: 30px;
+      letter-spacing: -0.02em;
+    }
+
+    h3 {
+      margin-top: 0;
+      font-size: 20px;
+    }
+
+    p {
+      color: var(--muted);
+    }
+
+    .hero-description {
+      max-width: 850px;
+      font-size: 18px;
+    }
+
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(14px);
+      background: rgba(11, 16, 32, 0.82);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-inner {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 12px 0;
+    }
+
+    .nav-inner a {
+      white-space: nowrap;
+      padding: 8px 12px;
+      border-radius: 8px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .nav-inner a:hover {
+      background: var(--panel);
+      color: var(--text);
+    }
+
+    section {
+      padding: 60px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .grid {
+      display: grid;
+      gap: 20px;
+    }
+
+    .grid-2 {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .grid-3 {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .card {
+      background: linear-gradient(
+        145deg,
+        rgba(23, 32, 57, 0.92),
+        rgba(17, 24, 43, 0.92)
+      );
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      box-shadow: var(--shadow);
+    }
+
+    .card p:last-child {
+      margin-bottom: 0;
+    }
+
+    .architecture {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin: 40px 0;
+    }
+
+    .node {
+      min-width: 190px;
+      padding: 22px;
+      text-align: center;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--panel-2);
+      transition: 0.2s ease;
+    }
+
+    .node:hover {
+      transform: translateY(-3px);
+      border-color: var(--primary);
+    }
+
+    .node-icon {
+      font-size: 34px;
+      margin-bottom: 8px;
+    }
+
+    .node-title {
+      font-weight: 800;
+      font-size: 17px;
+    }
+
+    .node-subtitle {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 4px;
+    }
+
+    .arrow {
+      font-size: 30px;
+      color: var(--primary);
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .success {
+      color: var(--success);
+      background: rgba(72, 213, 151, 0.1);
+    }
+
+    .warning {
+      color: var(--warning);
+      background: rgba(244, 201, 93, 0.1);
+    }
+
+    .danger {
+      color: var(--danger);
+      background: rgba(255, 107, 122, 0.1);
+    }
+
+    .info {
+      color: var(--primary);
+      background: rgba(110, 168, 254, 0.1);
+    }
+
+    .purple {
+      color: var(--purple);
+      background: rgba(181, 140, 255, 0.1);
+    }
+
+    pre {
+      background: #080d19;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px;
+      overflow-x: auto;
+      color: #dce6ff;
+      font-size: 13px;
+      line-height: 1.65;
+    }
+
+    .highlight {
+      border-left: 4px solid var(--primary);
+      background: rgba(110, 168, 254, 0.07);
+      padding: 18px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 20px 0;
+    }
+
+    .danger-box {
+      border-left: 4px solid var(--danger);
+      background: rgba(255, 107, 122, 0.07);
+      padding: 18px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 20px 0;
+    }
+
+    .success-box {
+      border-left: 4px solid var(--success);
+      background: rgba(72, 213, 151, 0.07);
+      padding: 18px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 20px 0;
+    }
+
+    .flow {
+      display: grid;
+      gap: 12px;
+      margin-top: 25px;
+    }
+
+    .flow-step {
+      display: grid;
+      grid-template-columns: 42px 1fr;
+      gap: 15px;
+      align-items: start;
+      padding: 16px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: rgba(17, 24, 43, 0.7);
+    }
+
+    .step-number {
+      width: 36px;
+      height: 36px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: rgba(110, 168, 254, 0.12);
+      color: var(--primary);
+      font-weight: 800;
+    }
+
+    .flow-step strong {
+      display: block;
+      margin-bottom: 3px;
+    }
+
+    .table-wrapper {
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 800px;
+    }
+
+    th,
+    td {
+      padding: 15px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    th {
+      background: var(--panel-2);
+      color: var(--text);
+      font-size: 13px;
+    }
+
+    td {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    .diagram-large {
+      background: #080d19;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 28px;
+      overflow-x: auto;
+    }
+
+    .diagram-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      min-width: 900px;
+    }
+
+    .diagram-box {
+      min-width: 180px;
+      padding: 20px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      text-align: center;
+      background: var(--panel);
+    }
+
+    .diagram-box small {
+      color: var(--muted);
+    }
+
+    .replication {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-top: 20px;
+    }
+
+    .broker {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px;
+      background: var(--panel);
+    }
+
+    .broker.leader {
+      border-color: var(--success);
+    }
+
+    .broker h4 {
+      margin: 0 0 10px;
+    }
+
+    .partition {
+      margin-top: 14px;
+      padding: 12px;
+      background: #080d19;
+      border-radius: 8px;
+      font-family: monospace;
+      font-size: 12px;
+    }
+
+    .checklist {
+      display: grid;
+      gap: 10px;
+    }
+
+    .check {
+      padding: 14px 16px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--panel);
+    }
+
+    .check strong {
+      color: var(--success);
+    }
+
+    .toc {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+
+    .toc a {
+      padding: 14px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--panel);
+      color: var(--muted);
+    }
+
+    .toc a:hover {
+      color: var(--text);
+      border-color: var(--primary);
+    }
+
+    .footer {
+      padding: 40px 0 60px;
+      text-align: center;
+      color: var(--muted);
+    }
+
+    .mini-code {
+      display: inline-block;
+      padding: 3px 7px;
+      border-radius: 6px;
+      background: #080d19;
+      border: 1px solid var(--border);
+      color: var(--cyan);
+      font-family: monospace;
+      font-size: 12px;
+    }
+
+    ul {
+      color: var(--muted);
+    }
+
+    li {
+      margin-bottom: 7px;
+    }
+
+    @media (max-width: 900px) {
+      .grid-2,
+      .grid-3,
+      .toc {
+        grid-template-columns: 1fr;
+      }
+
+      .architecture {
+        flex-direction: column;
+      }
+
+      .arrow {
+        transform: rotate(90deg);
+      }
+
+      .replication {
+        grid-template-columns: 1fr;
+      }
+
+      header {
+        padding-top: 40px;
+      }
+
+      .container {
+        width: min(100% - 24px, 1400px);
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <header>
+    <div class="container">
+      <span class="badge">MICROSERVICES · DISTRIBUTED SYSTEMS · KAFKA</span>
+
+      <h1>Service A → Kafka → Service B</h1>
+
+      <p class="hero-description">
+        A practical guide to designing a reliable message flow between
+        Service A and Service B, including failure scenarios, retries,
+        duplicate messages, Kafka broker failures, idempotency,
+        Transactional Outbox, DLQ/DLT, consumer lag and recovery.
+      </p>
+
+      <div class="architecture">
+        <div class="node">
+          <div class="node-icon">🟦</div>
+          <div class="node-title">Service A</div>
+          <div class="node-subtitle">Producer</div>
+        </div>
+
+        <div class="arrow">→</div>
+
+        <div class="node">
+          <div class="node-icon">🟧</div>
+          <div class="node-title">Kafka</div>
+          <div class="node-subtitle">Message Broker</div>
+        </div>
+
+        <div class="arrow">→</div>
+
+        <div class="node">
+          <div class="node-icon">🟩</div>
+          <div class="node-title">Service B</div>
+          <div class="node-subtitle">Consumer</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <nav>
+    <div class="container nav-inner">
+      <a href="#overview">Overview</a>
+      <a href="#normal-flow">Normal Flow</a>
+      <a href="#failure-a">Service A Failure</a>
+      <a href="#kafka-failure">Kafka Failure</a>
+      <a href="#service-b">Service B Failure</a>
+      <a href="#duplicates">Duplicates</a>
+      <a href="#outbox">Outbox</a>
+      <a href="#replication">Kafka Replication</a>
+      <a href="#dlq">DLQ / DLT</a>
+      <a href="#lag">Consumer Lag</a>
+      <a href="#matrix">Failure Matrix</a>
+      <a href="#production">Production Design</a>
+    </div>
+  </nav>
+
+  <main>
+
+    <!-- OVERVIEW -->
+    <section id="overview">
+      <div class="container">
+
+        <h2>1. The Basic Architecture</h2>
+
+        <p>
+          The basic communication pattern is:
+        </p>
+
+        <div class="diagram-large">
+          <div class="diagram-row">
+            <div class="diagram-box">
+              <strong>Service A</strong>
+              <br />
+              <small>Creates business event</small>
+            </div>
+
+            <div class="arrow">→</div>
+
+            <div class="diagram-box">
+              <strong>Kafka</strong>
+              <br />
+              <small>Stores and distributes event</small>
+            </div>
+
+            <div class="arrow">→</div>
+
+            <div class="diagram-box">
+              <strong>Service B</strong>
+              <br />
+              <small>Consumes and processes event</small>
+            </div>
+          </div>
+        </div>
+
+        <div class="highlight">
+          <strong>Important:</strong>
+          Do not design this flow assuming every step always succeeds.
+          In a distributed system, every network call, process and broker
+          can fail.
+        </div>
+
+        <div class="grid grid-3">
+
+          <div class="card">
+            <span class="status info">Producer</span>
+            <h3>Service A</h3>
+            <p>
+              Creates the event and publishes it to Kafka.
+            </p>
+          </div>
+
+          <div class="card">
+            <span class="status warning">Broker</span>
+            <h3>Kafka</h3>
+            <p>
+              Stores events and makes them available to consumers.
+            </p>
+          </div>
+
+          <div class="card">
+            <span class="status success">Consumer</span>
+            <h3>Service B</h3>
+            <p>
+              Reads the event and performs business processing.
+            </p>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- NORMAL FLOW -->
+    <section id="normal-flow">
+      <div class="container">
+
+        <h2>2. Normal Message Flow</h2>
+
+        <div class="flow">
+
+          <div class="flow-step">
+            <div class="step-number">1</div>
+            <div>
+              <strong>Service A creates business data</strong>
+              <span class="status success">SUCCESS</span>
+              <p>
+                Example: a customer creates an order.
+              </p>
+            </div>
+          </div>
+
+          <div class="flow-step">
+            <div class="step-number">2</div>
+            <div>
+              <strong>Service A publishes OrderCreated</strong>
+              <span class="status success">SUCCESS</span>
+              <p>
+                The producer sends an event to a Kafka topic.
+              </p>
+            </div>
+          </div>
+
+          <div class="flow-step">
+            <div class="step-number">3</div>
+            <div>
+              <strong>Kafka stores the message</strong>
+              <span class="status success">SUCCESS</span>
+              <p>
+                Kafka writes the record to a partition and replicates it
+                according to the topic configuration.
+              </p>
+            </div>
+          </div>
+
+          <div class="flow-step">
+            <div class="step-number">4</div>
+            <div>
+              <strong>Service B consumes the message</strong>
+              <span class="status success">SUCCESS</span>
+              <p>
+                The consumer receives the event from Kafka.
+              </p>
+            </div>
+          </div>
+
+          <div class="flow-step">
+            <div class="step-number">5</div>
+            <div>
+              <strong>Service B updates its database</strong>
+              <span class="status success">SUCCESS</span>
+              <p>
+                The business operation is committed.
+              </p>
+            </div>
+          </div>
+
+          <div class="flow-step">
+            <div class="step-number">6</div>
+            <div>
+              <strong>Service B commits its Kafka offset</strong>
+              <span class="status success">SUCCESS</span>
+              <p>
+                Kafka knows the consumer has successfully processed the
+                message.
+              </p>
+            </div>
+          </div>
+
+        </div>
+
+        <pre>
+Service A
+   |
+   | OrderCreated
+   v
+Kafka Topic
+   |
+   | consume
+   v
+Service B
+   |
+   | update DB
+   v
+Service B Database
+   |
+   | commit offset
+   v
+Kafka Consumer Group
+        </pre>
+
+      </div>
+    </section>
+
+    <!-- SERVICE A FAILURE -->
+    <section id="failure-a">
+      <div class="container">
+
+        <h2>3. Service A Fails</h2>
+
+        <div class="grid grid-2">
+
+          <div class="card">
+            <span class="status danger">PROBLEM</span>
+            <h3>A crashes before publishing</h3>
+
+            <pre>
+Service A
+   |
+   | save order
+   v
+Database ✅
+
+Service A crashes ❌
+
+Kafka
+   |
+   X
+No event
+            </pre>
+
+            <p>
+              The database contains the order, but Service B never receives
+              the OrderCreated event.
+            </p>
+          </div>
+
+          <div class="card">
+            <span class="status success">SOLUTION</span>
+            <h3>Transactional Outbox</h3>
+
+            <pre>
+BEGIN TRANSACTION
+
+INSERT order
+
+INSERT outbox_event
+
+COMMIT
+
+        ↓
+
+Outbox Publisher
+
+        ↓
+
+Kafka
+            </pre>
+
+            <p>
+              Store the business data and the event in the same database
+              transaction.
+            </p>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- KAFKA FAILURE -->
+    <section id="kafka-failure">
+      <div class="container">
+
+        <h2>4. Kafka Crashes or Becomes Unavailable</h2>
+
+        <div class="danger-box">
+          <strong>Example:</strong>
+          Service A tries to publish an event, but Kafka is temporarily
+          unavailable.
+        </div>
+
+        <pre>
+Service A
+    |
+    | publish
+    v
+Kafka
+    X
+    |
+    | connection timeout
+    v
+Service A
+        </pre>
+
+        <h3>Possible causes</h3>
+
+        <div class="grid grid-3">
+
+          <div class="card">
+            <h3>Broker Crash</h3>
+            <p>
+              One or more Kafka brokers are unavailable.
+            </p>
+          </div>
+
+          <div class="card">
+            <h3>Network Failure</h3>
+            <p>
+              Service A cannot communicate with Kafka.
+            </p>
+          </div>
+
+          <div class="card">
+            <h3>Cluster Problem</h3>
+            <p>
+              No suitable leader or in-sync replica is available.
+            </p>
+          </div>
+
+        </div>
+
+        <h3 style="margin-top: 35px;">
+          What should Service A do?
+        </h3>
+
+        <pre>
+Service A
+   |
+   +---- publish ----> Kafka ❌
+   |
+   +---- retry ------> Kafka ❌
+   |
+   +---- retry ------> Kafka ❌
+   |
+   +---- retry ------> Kafka ✅
+        </pre>
+
+        <div class="highlight">
+          <strong>Better architecture:</strong>
+          Use a Transactional Outbox so Kafka availability does not
+          determine whether the business transaction succeeds.
+        </div>
+
+      </div>
+    </section>
+
+    <!-- PRODUCER DUPLICATES -->
+    <section id="duplicates">
+      <div class="container">
+
+        <h2>5. Producer Retry Can Create Duplicates</h2>
+
+        <p>
+          One of the most subtle distributed-system problems is that
+          Service A may not know whether Kafka actually received the event.
+        </p>
+
+        <pre>
+Service A
+   |
+   | OrderCreated
+   v
+Kafka
+   |
+   | message received ✅
+   |
+   X
+ACK lost
+   |
+   v
+Service A thinks:
+"Kafka failed"
+
+Service A retries
+   |
+   v
+Kafka
+        </pre>
+
+        <p>
+          Kafka may now contain two copies of the same logical event.
+        </p>
+
+        <pre>
+OrderCreated eventId=1001
+OrderCreated eventId=1001
+        </pre>
+
+        <div class="success-box">
+          <strong>Solution:</strong>
+          Use producer idempotence where appropriate and make consumers
+          idempotent.
+        </div>
+
+      </div>
+    </section>
+
+    <!-- SERVICE B -->
+    <section id="service-b">
+      <div class="container">
+
+        <h2>6. Service B Fails</h2>
+
+        <div class="grid grid-2">
+
+          <div class="card">
+
+            <span class="status danger">CASE A</span>
+
+            <h3>Service B is completely down</h3>
+
+            <pre>
+Kafka
+  |
+  | messages
+  v
+Service B ❌
+            </pre>
+
+            <p>
+              Kafka can retain the messages. When Service B comes back,
+              it can continue consuming from its committed offset.
+            </p>
+
+          </div>
+
+          <div class="card">
+
+            <span class="status danger">CASE B</span>
+
+            <h3>B crashes during processing</h3>
+
+            <pre>
+Kafka
+  |
+  v
+Service B
+  |
+  v
+Database ✅
+  |
+  X
+B crashes
+            </pre>
+
+            <p>
+              If the offset was not committed, Service B may receive the
+              same message again after restarting.
+            </p>
+
+          </div>
+
+        </div>
+
+        <div class="highlight">
+          This is why consumers should be designed for
+          <strong>at-least-once delivery</strong> and idempotent processing.
+        </div>
+
+      </div>
+    </section>
+
+    <!-- IDEMPOTENCY -->
+    <section id="idempotency">
+      <div class="container">
+
+        <h2>7. Idempotent Consumer</h2>
+
+        <p>
+          Give every event a unique event ID.
+        </p>
+
+        <pre>
+{
+  "eventId": "evt-10001",
+  "eventType": "OrderCreated",
+  "orderId": "order-123",
+  "timestamp": "2026-08-21T10:00:00Z"
+}
+        </pre>
+
+        <p>
+          Service B can maintain a table of processed event IDs:
+        </p>
+
+        <pre>
+processed_events
+
+event_id
+----------------
+evt-10001
+evt-10002
+evt-10003
+        </pre>
+
+        <div class="flow">
+
+          <div class="flow-step">
+            <div class="step-number">1</div>
+            <div>
+              <strong>Receive event</strong>
+              <p>eventId = evt-10001</p>
+            </div>
+          </div>
+
+          <div class="flow-step">
+            <div class="step-number">2</div>
+            <div>
+              <strong>Check processed_events</strong>
+              <p>Has evt-10001 already been processed?</p>
+            </div>
+          </div>
+
+          <div class="flow-step">
+            <div class="step-number">3</div>
+            <div>
+              <strong>If already processed</strong>
+              <span class="status warning">IGNORE</span>
+              <p>Do not perform the business operation again.</p>
+            </div>
+          </div>
+
+          <div class="flow-step">
+            <div class="step-number">4</div>
+            <div>
+              <strong>If not processed</strong>
+              <span class="status success">PROCESS</span>
+              <p>Perform the business transaction and record the event ID.</p>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- OUTBOX -->
+    <section id="outbox">
+      <div class="container">
+
+        <h2>8. Transactional Outbox Pattern</h2>
+
+        <p>
+          The Outbox Pattern solves the problem where Service A successfully
+          updates its database but fails to publish the corresponding event.
+        </p>
+
+        <div class="diagram-large">
+
+          <div class="diagram-row">
+
+            <div class="diagram-box">
+              <strong>Service A</strong>
+              <br />
+              <small>Business operation</small>
+            </div>
+
+            <div class="arrow">→</div>
+
+            <div class="diagram-box">
+              <strong>Database</strong>
+              <br />
+              <small>Orders + Outbox</small>
+            </div>
+
+            <div class="arrow">→</div>
+
+            <div class="diagram-box">
+              <strong>Outbox Publisher</strong>
+              <br />
+              <small>Retries</small>
+            </div>
+
+            <div class="arrow">→</div>
+
+            <div class="diagram-box">
+              <strong>Kafka</strong>
+              <br />
+              <small>Event Broker</small>
+            </div>
+
+          </div>
+
+        </div>
+
+        <h3>Database transaction</h3>
+
+        <pre>
+BEGIN;
+
+INSERT INTO orders (
+    id,
+    customer_id,
+    amount
+)
+VALUES (
+    1001,
+    50,
+    200
+);
+
+INSERT INTO outbox_events (
+    id,
+    event_type,
+    payload,
+    status
+)
+VALUES (
+    999,
+    'OrderCreated',
+    '{...}',
+    'PENDING'
+);
+
+COMMIT;
+        </pre>
+
+        <p>
+          If Kafka is down, the event remains in the outbox.
+        </p>
+
+        <pre>
+outbox_events
+
+id     event_type      status
+--------------------------------
+999    OrderCreated    PENDING
+1000   OrderCreated    PENDING
+1001   OrderPaid       PENDING
+        </pre>
+
+        <p>
+          When Kafka becomes available again, the publisher retries the
+          pending events.
+        </p>
+
+      </div>
+    </section>
+
+    <!-- KAFKA REPLICATION -->
+    <section id="replication">
+      <div class="container">
+
+        <h2>9. Kafka Broker Crash & Replication</h2>
+
+        <p>
+          Production Kafka normally runs as a cluster instead of relying
+          on a single broker.
+        </p>
+
+        <div class="replication">
+
+          <div class="broker leader">
+            <h4>Broker 1 ⭐ Leader</h4>
+
+            <span class="status success">
+              ACTIVE
+            </span>
+
+            <div class="partition">
+              Partition 0<br />
+              Order 1<br />
+              Order 2<br />
+              Order 3
+            </div>
+          </div>
+
+          <div class="broker">
+            <h4>Broker 2</h4>
+
+            <span class="status info">
+              REPLICA
+            </span>
+
+            <div class="partition">
+              Partition 0<br />
+              Order 1<br />
+              Order 2<br />
+              Order 3
+            </div>
+          </div>
+
+          <div class="broker">
+            <h4>Broker 3</h4>
+
+            <span class="status info">
+              REPLICA
+            </span>
+
+            <div class="partition">
+              Partition 0<br />
+              Order 1<br />
+              Order 2<br />
+              Order 3
+            </div>
+          </div>
+
+        </div>
+
+        <h3 style="margin-top: 35px;">
+          Broker 1 crashes
+        </h3>
+
+        <pre>
+Before:
+
+Broker 1 ⭐ Leader
+Broker 2   Replica
+Broker 3   Replica
+
+
+After:
+
+Broker 1 ❌
+
+Broker 2 ⭐ New Leader
+Broker 3   Replica
+        </pre>
+
+        <div class="success-box">
+          Kafka can elect another eligible replica as the partition leader.
+        </div>
+
+        <h3>Important configuration concepts</h3>
+
+        <div class="grid grid-3">
+
+          <div class="card">
+            <h3>Replication Factor</h3>
+            <p>
+              Determines how many copies of a partition are maintained.
+            </p>
+          </div>
+
+          <div class="card">
+            <h3>acks=all</h3>
+            <p>
+              Producer waits for the required in-sync replicas to
+              acknowledge the record.
+            </p>
+          </div>
+
+          <div class="card">
+            <h3>min.insync.replicas</h3>
+            <p>
+              Controls the minimum number of in-sync replicas required
+              for writes when using appropriate producer acknowledgements.
+            </p>
+          </div>
+
+        </div>
+
+        <div class="danger-box">
+          <strong>Important:</strong>
+          Replication does not protect an event that Service A never
+          successfully publishes. Kafka durability and application-level
+          delivery are different problems.
+        </div>
+
+      </div>
+    </section>
+
+    <!-- DLQ -->
+    <section id="dlq">
+      <div class="container">
+
+        <h2>10. Retry and Dead Letter Topic</h2>
+
+        <p>
+          Some messages fail temporarily. Others are permanently invalid.
+          You should handle these differently.
+        </p>
+
+        <pre>
+Kafka
+  |
+  v
+Service B
+  |
+  X
+Processing failed
+  |
+  +------ retry ------+
+  |                   |
+  +------ retry ------+
+  |
+  | maximum attempts reached
+  v
+Dead Letter Topic
+        </pre>
+
+        <div class="grid grid-2">
+
+          <div class="card">
+            <span class="status warning">TEMPORARY FAILURE</span>
+
+            <h3>Retry</h3>
+
+            <ul>
+              <li>Database temporarily unavailable</li>
+              <li>Network timeout</li>
+              <li>External API temporarily unavailable</li>
+              <li>Temporary Kafka problem</li>
+            </ul>
+
+          </div>
+
+          <div class="card">
+            <span class="status danger">PERMANENT FAILURE</span>
+
+            <h3>DLQ / DLT</h3>
+
+            <ul>
+              <li>Invalid message schema</li>
+              <li>Invalid business data</li>
+              <li>Unsupported event version</li>
+              <li>Repeated processing failure</li>
+            </ul>
+
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- LAG -->
+    <section id="lag">
+      <div class="container">
+
+        <h2>11. Consumer Lag</h2>
+
+        <p>
+          Suppose Service A produces messages faster than Service B can
+          process them.
+        </p>
+
+        <pre>
+Producer
+   |
+   | 100,000 messages/sec
+   v
+Kafka
+   |
+   | 10,000 messages/sec
+   v
+Service B
+        </pre>
+
+        <p>
+          Kafka accumulates messages and consumer lag grows.
+        </p>
+
+        <div class="card">
+
+          <h3>Example</h3>
+
+          <pre>
+Consumer Lag
+
+10,000
+20,000
+50,000
+100,000
+200,000
+          </pre>
+
+          <p>
+            If lag continues increasing, Service B may need to scale
+            horizontally or the system may need more Kafka partitions.
+          </p>
+
+        </div>
+
+        <div class="highlight">
+          Kafka consumer groups allow multiple instances of Service B
+          to process different partitions in parallel.
+        </div>
+
+        <pre>
+                    Kafka
+             +---------+---------+
+             |         |         |
+             v         v         v
+          Partition Partition Partition
+             0         1         2
+             |         |         |
+             v         v         v
+            B1        B2        B3
+        </pre>
+
+      </div>
+    </section>
+
+    <!-- ORDERING -->
+    <section id="ordering">
+      <div class="container">
+
+        <h2>12. Message Ordering</h2>
+
+        <p>
+          Suppose Service A produces:
+        </p>
+
+        <pre>
+OrderCreated
+OrderPaid
+OrderShipped
+        </pre>
+
+        <p>
+          If these events belong to the same order, you often want them
+          processed in order.
+        </p>
+
+        <p>
+          With Kafka, ordering is guaranteed within a partition.
+          A common design is to use the business identifier as the key.
+        </p>
+
+        <pre>
+key = orderId
+
+order-1001
+    |
+    +--> Partition 3
+          |
+          +--> OrderCreated
+          +--> OrderPaid
+          +--> OrderShipped
+        </pre>
+
+        <div class="highlight">
+          Do not assume Kafka provides global ordering across all
+          partitions.
+        </div>
+
+      </div>
+    </section>
+
+    <!-- SCHEMA -->
+    <section id="schema">
+      <div class="container">
+
+        <h2>13. Event Schema Changes</h2>
+
+        <p>
+          Service A and Service B may be deployed independently.
+          Therefore, event compatibility matters.
+        </p>
+
+        <pre>
+Version 1
+
+{
+  "orderId": 123,
+  "amount": 100
+}
+
+
+Version 2
+
+{
+  "orderId": 123,
+  "amount": 100,
+  "currency": "USD"
+}
+        </pre>
+
+        <div class="grid grid-3">
+
+          <div class="card">
+            <h3>Backward Compatibility</h3>
+            <p>
+              New consumers should still understand older events when
+              required.
+            </p>
+          </div>
+
+          <div class="card">
+            <h3>Schema Version</h3>
+            <p>
+              Explicitly version important event contracts.
+            </p>
+          </div>
+
+          <div class="card">
+            <h3>Schema Registry</h3>
+            <p>
+              Kafka environments commonly use schema management tools
+              to enforce compatibility rules.
+            </p>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- FAILURE MATRIX -->
+    <section id="matrix">
+      <div class="container">
+
+        <h2>14. Failure Matrix</h2>
+
+        <div class="table-wrapper">
+
+          <table>
+
+            <thead>
+              <tr>
+                <th>Failure</th>
+                <th>What Happens?</th>
+                <th>Risk</th>
+                <th>Typical Solution</th>
+              </tr>
+            </thead>
+
+            <tbody>
+
+              <tr>
+                <td>A crashes before publishing</td>
+                <td>Kafka never receives the event.</td>
+                <td>
+                  <span class="status danger">Event Lost</span>
+                </td>
+                <td>Transactional Outbox</td>
+              </tr>
+
+              <tr>
+                <td>Kafka unavailable</td>
+                <td>Producer cannot publish.</td>
+                <td>
+                  <span class="status warning">Temporary Failure</span>
+                </td>
+                <td>Retry + Outbox</td>
+              </tr>
+
+              <tr>
+                <td>Producer timeout</td>
+                <td>Kafka may have received the event but producer doesn't know.</td>
+                <td>
+                  <span class="status warning">Duplicate Risk</span>
+                </td>
+                <td>Idempotent producer + consumer</td>
+              </tr>
+
+              <tr>
+                <td>Kafka broker crashes</td>
+                <td>Leader may be unavailable.</td>
+                <td>
+                  <span class="status warning">Availability Risk</span>
+                </td>
+                <td>Replication + leader election</td>
+              </tr>
+
+              <tr>
+                <td>B is down</td>
+                <td>Messages remain available in Kafka.</td>
+                <td>
+                  <span class="status info">Lag</span>
+                </td>
+                <td>Consumer recovery</td>
+              </tr>
+
+              <tr>
+                <td>B crashes after DB commit</td>
+                <td>Message may be processed again.</td>
+                <td>
+                  <span class="status warning">Duplicate</span>
+                </td>
+                <td>Idempotent consumer</td>
+              </tr>
+
+              <tr>
+                <td>B processing fails</td>
+                <td>Message cannot be completed.</td>
+                <td>
+                  <span class="status warning">Retry</span>
+                </td>
+                <td>Retry policy</td>
+              </tr>
+
+              <tr>
+                <td>Message always fails</td>
+                <td>Repeated retries waste resources.</td>
+                <td>
+                  <span class="status danger">Poison Message</span>
+                </td>
+                <td>DLQ / DLT</td>
+              </tr>
+
+              <tr>
+                <td>B too slow</td>
+                <td>Consumer lag increases.</td>
+                <td>
+                  <span class="status warning">Backlog</span>
+                </td>
+                <td>Scale consumers / partitions</td>
+              </tr>
+
+              <tr>
+                <td>Event schema changes</td>
+                <td>B may not understand the event.</td>
+                <td>
+                  <span class="status danger">Compatibility</span>
+                </td>
+                <td>Schema versioning</td>
+              </tr>
+
+            </tbody>
+
+          </table>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- PRODUCTION -->
+    <section id="production">
+      <div class="container">
+
+        <h2>15. Recommended Production Architecture</h2>
+
+        <div class="diagram-large">
+
+          <div class="diagram-row">
+
+            <div class="diagram-box">
+              <strong>Service A</strong>
+              <br />
+              <small>Business logic</small>
+            </div>
+
+            <div class="arrow">→</div>
+
+            <div class="diagram-box">
+              <strong>DB</strong>
+              <br />
+              <small>Business + Outbox</small>
+            </div>
+
+            <div class="arrow">→</div>
+
+            <div class="diagram-box">
+              <strong>Outbox Publisher</strong>
+              <br />
+              <small>Retry</small>
+            </div>
+
+            <div class="arrow">→</div>
+
+            <div class="diagram-box">
+              <strong>Kafka Cluster</strong>
+              <br />
+              <small>Replicated</small>
+            </div>
+
+            <div class="arrow">→</div>
+
+            <div class="diagram-box">
+              <strong>Service B</strong>
+              <br />
+              <small>Idempotent Consumer</small>
+            </div>
+
+          </div>
+
+        </div>
+
+        <h3>Recommended reliability mechanisms</h3>
+
+        <div class="checklist">
+
+          <div class="check">
+            <strong>✓ Transactional Outbox</strong>
+            <p>
+              Prevents losing an event between a database transaction
+              and Kafka publishing.
+            </p>
+          </div>
+
+          <div class="check">
+            <strong>✓ Kafka Replication</strong>
+            <p>
+              Protects partition data against individual broker failures.
+            </p>
+          </div>
+
+          <div class="check">
+            <strong>✓ Producer Idempotence</strong>
+            <p>
+              Helps prevent duplicates caused by producer retries.
+            </p>
+          </div>
+
+          <div class="check">
+            <strong>✓ Consumer Idempotency</strong>
+            <p>
+              Allows safe processing when the same event is delivered
+              more than once.
+            </p>
+          </div>
+
+          <div class="check">
+            <strong>✓ Retry Policy</strong>
+            <p>
+              Handles temporary failures.
+            </p>
+          </div>
+
+          <div class="check">
+            <strong>✓ DLQ / DLT</strong>
+            <p>
+              Separates permanently failing messages from normal traffic.
+            </p>
+          </div>
+
+          <div class="check">
+            <strong>✓ Consumer Lag Monitoring</strong>
+            <p>
+              Detects consumers that cannot keep up with producers.
+            </p>
+          </div>
+
+          <div class="check">
+            <strong>✓ Schema Compatibility</strong>
+            <p>
+              Prevents independent service deployments from breaking
+              event contracts.
+            </p>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- FINAL -->
+    <section id="summary">
+      <div class="container">
+
+        <h2>16. The Mental Model</h2>
+
+        <p>
+          The most important thing is to stop thinking of the system as
+          simply:
+        </p>
+
+        <pre>
+Service A → Kafka → Service B
+        </pre>
+
+        <p>
+          Instead, think about every possible failure:
+        </p>
+
+        <pre>
+                       ┌──────────────┐
+                       │  Service A   │
+                       └──────┬───────┘
+                              │
+                     Can A crash?
+                              │
+                              ↓
+                       ┌──────────────┐
+                       │    Outbox    │
+                       └──────┬───────┘
+                              │
+                     Can Kafka fail?
+                              │
+                              ↓
+                    ┌─────────────────┐
+                    │ Kafka Cluster   │
+                    │                 │
+                    │ Broker 1        │
+                    │ Broker 2        │
+                    │ Broker 3        │
+                    └────────┬────────┘
+                             │
+                    Can B be unavailable?
+                             │
+                             ↓
+                       ┌──────────────┐
+                       │  Service B   │
+                       └──────┬───────┘
+                              │
+                    Can processing fail?
+                              │
+                 ┌────────────┴────────────┐
+                 │                         │
+               Retry                       DLQ
+                 │                         │
+                 └────────────┬────────────┘
+                              │
+                         Idempotency
+                              │
+                              ↓
+                           Database
+        </pre>
+
+        <div class="success-box">
+          <strong>Core principle:</strong>
+          In a distributed system, assume that every component can fail,
+          every network call can timeout, messages can be duplicated,
+          consumers can crash, and brokers can become unavailable.
+          Design the system so that recovery is safe.
+        </div>
+
+        <h3>Key concepts to remember</h3>
+
+        <div class="grid grid-3">
+
+          <div class="card">
+            <span class="mini-code">Outbox</span>
+            <h3>Don't lose events</h3>
+            <p>
+              Store the business transaction and event reliably before
+              publishing.
+            </p>
+          </div>
+
+          <div class="card">
+            <span class="mini-code">Idempotency</span>
+            <h3>Handle duplicates</h3>
+            <p>
+              The same event can be processed more than once safely.
+            </p>
+          </div>
+
+          <div class="card">
+            <span class="mini-code">Replication</span>
+            <h3>Survive broker failure</h3>
+            <p>
+              Keep replicated copies of Kafka partitions.
+            </p>
+          </div>
+
+          <div class="card">
+            <span class="mini-code">Retry</span>
+            <h3>Recover from temporary failure</h3>
+            <p>
+              Retry operations that can succeed later.
+            </p>
+          </div>
+
+          <div class="card">
+            <span class="mini-code">DLQ / DLT</span>
+            <h3>Isolate bad messages</h3>
+            <p>
+              Prevent poison messages from blocking normal processing.
+            </p>
+          </div>
+
+          <div class="card">
+            <span class="mini-code">Lag</span>
+            <h3>Monitor consumers</h3>
+            <p>
+              Detect when consumers cannot keep up with producers.
+            </p>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <footer>
+    <div class="container footer">
+      Service A → Kafka → Service B · Distributed Systems Reliability
+    </div>
+  </footer>
+
+</body>
+</html>

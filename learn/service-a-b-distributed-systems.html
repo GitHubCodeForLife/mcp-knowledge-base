@@ -1,0 +1,1582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Service A → Service B: Distributed System Problems & Solutions</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family:
+        Inter, -apple-system, BlinkMacSystemFont, "Segoe UI",
+        Roboto, Arial, sans-serif;
+      line-height: 1.6;
+      color: #1f2937;
+      background: #f5f7fb;
+    }
+
+    header {
+      background: linear-gradient(135deg, #111827, #1e3a8a);
+      color: white;
+      padding: 60px 20px;
+    }
+
+    header .container {
+      max-width: 1100px;
+      margin: auto;
+    }
+
+    h1 {
+      font-size: 42px;
+      margin-bottom: 12px;
+    }
+
+    h2 {
+      margin-top: 50px;
+      color: #111827;
+      border-bottom: 2px solid #e5e7eb;
+      padding-bottom: 10px;
+    }
+
+    h3 {
+      margin-top: 30px;
+      color: #1e3a8a;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: auto;
+      padding: 0 20px;
+    }
+
+    main {
+      padding: 30px 0 80px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      box-shadow: 0 3px 15px rgba(0,0,0,0.06);
+    }
+
+    .summary {
+      border-left: 5px solid #2563eb;
+      background: #eff6ff;
+      padding: 18px 20px;
+      border-radius: 8px;
+      margin: 20px 0;
+    }
+
+    .warning {
+      border-left: 5px solid #f59e0b;
+      background: #fffbeb;
+      padding: 18px 20px;
+      border-radius: 8px;
+      margin: 20px 0;
+    }
+
+    .danger {
+      border-left: 5px solid #dc2626;
+      background: #fef2f2;
+      padding: 18px 20px;
+      border-radius: 8px;
+      margin: 20px 0;
+    }
+
+    .success {
+      border-left: 5px solid #16a34a;
+      background: #f0fdf4;
+      padding: 18px 20px;
+      border-radius: 8px;
+      margin: 20px 0;
+    }
+
+    pre {
+      background: #111827;
+      color: #e5e7eb;
+      padding: 20px;
+      border-radius: 10px;
+      overflow-x: auto;
+      line-height: 1.5;
+    }
+
+    code {
+      font-family: "SFMono-Regular", Consolas, monospace;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+      background: white;
+    }
+
+    th, td {
+      padding: 14px;
+      border: 1px solid #e5e7eb;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #1e3a8a;
+      color: white;
+    }
+
+    tr:nth-child(even) {
+      background: #f9fafb;
+    }
+
+    .tag {
+      display: inline-block;
+      background: #dbeafe;
+      color: #1d4ed8;
+      border-radius: 999px;
+      padding: 4px 10px;
+      margin: 3px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .architecture {
+      text-align: center;
+      font-family: monospace;
+      font-size: 16px;
+      white-space: pre;
+      overflow-x: auto;
+    }
+
+    .big {
+      font-size: 22px;
+      font-weight: 700;
+    }
+
+    .toc a {
+      color: #2563eb;
+      text-decoration: none;
+    }
+
+    .toc a:hover {
+      text-decoration: underline;
+    }
+
+    footer {
+      background: #111827;
+      color: #d1d5db;
+      padding: 30px;
+      text-align: center;
+    }
+
+    @media (max-width: 700px) {
+      h1 {
+        font-size: 32px;
+      }
+
+      table {
+        font-size: 14px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+<header>
+  <div class="container">
+    <h1>Service A → Service B</h1>
+    <p class="big">
+      Distributed Systems, Microservices & External HTTP Integration
+    </p>
+    <p>
+      Problems, failure scenarios, and practical solutions.
+    </p>
+  </div>
+</header>
+
+<main>
+<div class="container">
+
+  <!-- TABLE OF CONTENTS -->
+
+  <section class="card toc">
+    <h2>Table of Contents</h2>
+
+    <ol>
+      <li><a href="#big-picture">Big Picture</a></li>
+      <li><a href="#case1">Case 1: A → B, Both Internal</a></li>
+      <li><a href="#case2">Case 2: A → External B over HTTP</a></li>
+      <li><a href="#delivery">Problem 1: Did B Receive / Process the Request?</a></li>
+      <li><a href="#consistency">Problem 2: Keeping A and B Consistent</a></li>
+      <li><a href="#longtask">Problem 3: B Has a Long-Running Task</a></li>
+      <li><a href="#reliability">Other Reliability Problems</a></li>
+      <li><a href="#security">Security & API Problems</a></li>
+      <li><a href="#observability">Observability</a></li>
+      <li><a href="#reconciliation">Reconciliation</a></li>
+      <li><a href="#architecture">Recommended Architecture</a></li>
+      <li><a href="#comparison">Internal vs External Comparison</a></li>
+      <li><a href="#checklist">Production Checklist</a></li>
+    </ol>
+  </section>
+
+
+  <!-- BIG PICTURE -->
+
+  <section id="big-picture">
+
+    <h2>1. Big Picture</h2>
+
+    <div class="summary">
+      <strong>The fundamental problem:</strong>
+      Service A and Service B are separate components. Once communication
+      crosses a service or network boundary, you must assume that something
+      can fail between the two.
+    </div>
+
+    <pre class="architecture">
+Client
+  |
+  v
++-----------+
+| Service A |
++-----------+
+      |
+      | call
+      v
++-----------+
+| Service B |
++-----------+
+      |
+      v
+   Database
+    </pre>
+
+    <p>
+      The important question is not simply:
+    </p>
+
+    <div class="summary">
+      "How do I call B?"
+    </div>
+
+    <p>
+      The better question is:
+    </p>
+
+    <div class="summary">
+      <strong>
+        "What happens if A, B, the network, or the database fails
+        at every possible point in the operation?"
+      </strong>
+    </div>
+
+  </section>
+
+
+  <!-- CASE 1 -->
+
+  <section id="case1">
+
+    <h2>2. Case 1: Service A → Service B, Both Internal</h2>
+
+    <p>
+      Both services belong to your organization and are running inside
+      your infrastructure.
+    </p>
+
+    <pre>
+Client
+  |
+  v
++-----------+
+| Service A |
++-----------+
+      |
+      | HTTP / gRPC / Event
+      v
++-----------+
+| Service B |
++-----------+
+    </pre>
+
+    <h3>Main Problems</h3>
+
+    <div class="card">
+      <h3>1. Network Failure</h3>
+
+      <p>
+        Even though both services are internal, the network can fail.
+      </p>
+
+      <ul>
+        <li>Connection timeout</li>
+        <li>DNS failure</li>
+        <li>Packet loss</li>
+        <li>Load balancer failure</li>
+        <li>Service unavailable</li>
+      </ul>
+
+      <strong>Solutions:</strong>
+
+      <div>
+        <span class="tag">Timeout</span>
+        <span class="tag">Retry</span>
+        <span class="tag">Circuit Breaker</span>
+        <span class="tag">Load Balancer</span>
+      </div>
+    </div>
+
+
+    <div class="card">
+      <h3>2. Partial Failure</h3>
+
+      <pre>
+Service A      OK
+Service B      DOWN
+Database       OK
+      </pre>
+
+      <p>
+        The whole system is not necessarily down. One component may fail
+        while others continue working.
+      </p>
+
+      <strong>Solutions:</strong>
+
+      <ul>
+        <li>Graceful degradation</li>
+        <li>Fallback behavior</li>
+        <li>Timeouts</li>
+        <li>Circuit breakers</li>
+        <li>Queues for asynchronous work</li>
+      </ul>
+    </div>
+
+
+    <div class="card">
+      <h3>3. Distributed Transactions</h3>
+
+      <pre>
+Service A DB
+     |
+     +---- Order
+
+Service B DB
+     |
+     +---- Payment
+      </pre>
+
+      <p>
+        A normal database transaction usually cannot atomically update
+        both databases.
+      </p>
+
+      <strong>Solutions:</strong>
+
+      <ul>
+        <li>Saga Pattern</li>
+        <li>Compensating actions</li>
+        <li>Event-driven architecture</li>
+        <li>Two-phase commit in special cases</li>
+      </ul>
+    </div>
+
+
+    <div class="card">
+      <h3>4. Duplicate Requests / Messages</h3>
+
+      <pre>
+A → B
+     |
+     | timeout
+     |
+A → B   (retry)
+      </pre>
+
+      <p>
+        B may process the same request twice.
+      </p>
+
+      <strong>Solution:</strong>
+
+      <p>
+        Make operations <strong>idempotent</strong>.
+      </p>
+
+      <pre>
+Request ID = ORDER-123
+
+First request:
+ORDER-123 → process
+
+Retry:
+ORDER-123 → already processed → return existing result
+      </pre>
+    </div>
+
+
+    <div class="card">
+      <h3>5. Cascading Failure</h3>
+
+      <pre>
+A
+|
+v
+B (slow)
+|
+v
+A waits
+|
+v
+A becomes overloaded
+|
+v
+Other services fail
+      </pre>
+
+      <strong>Solutions:</strong>
+
+      <ul>
+        <li>Timeouts</li>
+        <li>Circuit breaker</li>
+        <li>Bulkheads</li>
+        <li>Rate limiting</li>
+        <li>Queues</li>
+      </ul>
+    </div>
+
+
+    <div class="card">
+      <h3>6. Debugging</h3>
+
+      <pre>
+Client
+  |
+  v
+A
+  |
+  v
+B
+  |
+  v
+Database
+      </pre>
+
+      <p>
+        Where exactly did the request fail?
+      </p>
+
+      <strong>Solutions:</strong>
+
+      <ul>
+        <li>Centralized logging</li>
+        <li>Correlation ID</li>
+        <li>Distributed tracing</li>
+        <li>Metrics</li>
+      </ul>
+    </div>
+
+  </section>
+
+
+  <!-- CASE 2 -->
+
+  <section id="case2">
+
+    <h2>3. Case 2: Service A → External Service B over HTTP</h2>
+
+    <p>
+      This case is more difficult because B belongs to another system
+      or company.
+    </p>
+
+    <pre>
++-----------+                     +----------------+
+| Service A |                     | External B     |
+|           |                     |                |
+| Your DB   |                     | External DB    |
++-----------+                     +----------------+
+      |                                    ^
+      |                                    |
+      +---------- HTTP --------------------+
+    </pre>
+
+    <div class="warning">
+      <strong>Important:</strong>
+      You do not control B's database, deployment, retry behavior,
+      API implementation, or availability.
+    </div>
+
+    <p>
+      Therefore, A should treat B as an unreliable external dependency.
+    </p>
+
+  </section>
+
+
+  <!-- DELIVERY -->
+
+  <section id="delivery">
+
+    <h2>4. Problem 1: Did B Receive / Process the Request?</h2>
+
+    <p>
+      This is one of the most important distributed-system problems.
+    </p>
+
+    <h3>Scenario A: B never receives the request</h3>
+
+    <pre>
+A --------X--------> B
+
+B: nothing happened
+    </pre>
+
+    <p>
+      A can usually retry.
+    </p>
+
+
+    <h3>Scenario B: B receives but processing fails</h3>
+
+    <pre>
+A -----------------> B
+                     |
+                     X
+                  failed
+    </pre>
+
+    <p>
+      Retry may be appropriate depending on the error.
+    </p>
+
+
+    <h3>Scenario C: B succeeds but response is lost</h3>
+
+    <pre>
+A -----------------> B
+                     |
+                     v
+                  SUCCESS
+                     |
+                     X
+                response lost
+    </pre>
+
+    <p>
+      A sees a timeout and does not know whether B succeeded.
+    </p>
+
+    <div class="danger">
+      <strong>Danger:</strong>
+      Blindly retrying may create a duplicate operation.
+    </div>
+
+
+    <h3>Solution: Idempotency Key</h3>
+
+    <pre>
+POST /orders
+
+Idempotency-Key: ORDER-123
+    </pre>
+
+    <p>
+      B stores the result associated with the key.
+    </p>
+
+    <pre>
+First request:
+
+ORDER-123 → create B-999
+
+Retry:
+
+ORDER-123 → return B-999
+             do NOT create another order
+    </pre>
+
+    <div class="success">
+      <strong>Best practice:</strong>
+      Always ask an external provider whether their API supports
+      idempotency keys or a unique client-generated reference.
+    </div>
+
+  </section>
+
+
+  <!-- CONSISTENCY -->
+
+  <section id="consistency">
+
+    <h2>5. Problem 2: Keeping A and B Consistent</h2>
+
+    <p>
+      Suppose A stores an order and B also stores information about
+      that order.
+    </p>
+
+    <pre>
+A DB:
+ORDER-123 = PENDING
+
+B:
+ORDER-123 = SUCCESS
+    </pre>
+
+    <p>
+      The two systems temporarily disagree.
+    </p>
+
+    <div class="warning">
+      You usually cannot make your database and an external HTTP service
+      behave like one atomic database transaction.
+    </div>
+
+
+    <h3>Use a State Machine</h3>
+
+    <pre>
+             PENDING
+                |
+                v
+           PROCESSING
+            /       \
+           /         \
+          v           v
+      SUCCESS       UNKNOWN
+                      |
+                      v
+                RECONCILING
+                   /    \
+                  v      v
+              SUCCESS   FAILED
+    </pre>
+
+
+    <h3>Why UNKNOWN Matters</h3>
+
+    <p>
+      If B times out, do not automatically assume that B failed.
+    </p>
+
+    <pre>
+A → B
+     |
+     | B processed successfully
+     |
+     X
+  timeout
+
+A does NOT know the truth.
+    </pre>
+
+    <p>
+      Therefore the correct state may be:
+    </p>
+
+    <pre>
+UNKNOWN
+    </pre>
+
+    <p>
+      Then A can retry safely using an idempotency key,
+      query B, or run reconciliation.
+    </p>
+
+
+    <h3>Transactional Outbox</h3>
+
+    <p>
+      Another problem occurs if A saves its database and then crashes
+      before calling B.
+    </p>
+
+    <pre>
+A DB:
+Order = PENDING
+
+Application:
+CRASHED
+
+B:
+No request
+    </pre>
+
+    <p>
+      Use an Outbox table.
+    </p>
+
+    <pre>
++--------------------------------+
+| A Database                     |
+|                                |
+| Orders                         |
+|   ORDER-123  PENDING           |
+|                                |
+| Outbox                         |
+|   CALL_B ORDER-123             |
++----------------+---------------+
+                 |
+                 v
+              Worker
+                 |
+                 v
+             HTTP → B
+    </pre>
+
+    <p>
+      Save the order and outbox event in the same local DB transaction.
+    </p>
+
+    <pre>
+BEGIN
+
+INSERT Order
+INSERT OutboxEvent
+
+COMMIT
+    </pre>
+
+    <p>
+      A background worker then processes the outbox.
+    </p>
+
+  </section>
+
+
+  <!-- LONG TASK -->
+
+  <section id="longtask">
+
+    <h2>6. Problem 3: B Has a Long-Running Task</h2>
+
+    <p>
+      Suppose B needs 30 minutes to complete an operation.
+    </p>
+
+    <div class="danger">
+      Do not normally keep an HTTP connection open for 30 minutes
+      waiting for the business operation to finish.
+    </div>
+
+
+    <h3>Use an Asynchronous Job</h3>
+
+    <pre>
+A
+|
+| POST /orders
+v
+B
+|
+| create job
+v
+202 Accepted
+
+{
+  "jobId": "B-12345",
+  "status": "PROCESSING"
+}
+    </pre>
+
+    <p>
+      B processes the job asynchronously.
+    </p>
+
+    <pre>
+B
+|
+v
+Worker
+|
+| long task
+|
+v
+COMPLETED
+    </pre>
+
+
+    <h3>How Does A Know It Finished?</h3>
+
+    <h4>Option 1: Polling</h4>
+
+    <pre>
+A → GET /jobs/B-12345
+B → PROCESSING
+
+A → GET /jobs/B-12345
+B → PROCESSING
+
+A → GET /jobs/B-12345
+B → COMPLETED
+    </pre>
+
+
+    <h4>Option 2: Webhook</h4>
+
+    <pre>
+B
+|
+| job completed
+|
+v
+POST /webhooks/job-completed
+|
+v
+A
+    </pre>
+
+
+    <h4>Option 3: Event / Message</h4>
+
+    <pre>
+B
+|
+v
+Message Queue
+|
+v
+Service A
+    </pre>
+
+    <p>
+      Which option is best depends on what B supports.
+    </p>
+
+  </section>
+
+
+  <!-- RELIABILITY -->
+
+  <section id="reliability">
+
+    <h2>7. Other Reliability Problems</h2>
+
+
+    <div class="card">
+
+      <h3>Timeout</h3>
+
+      <p>
+        Never wait forever for B.
+      </p>
+
+      <pre>
+Connection timeout
+Response timeout
+Business/job timeout
+      </pre>
+
+    </div>
+
+
+    <div class="card">
+
+      <h3>Retry</h3>
+
+      <p>
+        Retry transient failures with exponential backoff and jitter.
+      </p>
+
+      <pre>
+Retry 1 → 1 second
+Retry 2 → 5 seconds
+Retry 3 → 30 seconds
+Retry 4 → 5 minutes
+      </pre>
+
+      <p>
+        Do not blindly retry every error.
+      </p>
+
+      <pre>
+400 Bad Request → usually do NOT retry
+
+500 / 502 / 503 / timeout
+                  → potentially retry
+      </pre>
+
+    </div>
+
+
+    <div class="card">
+
+      <h3>Circuit Breaker</h3>
+
+      <pre>
+B is failing
+     |
+     v
+Circuit OPEN
+     |
+     v
+Stop sending requests temporarily
+     |
+     v
+Try again later
+      </pre>
+
+    </div>
+
+
+    <div class="card">
+
+      <h3>Rate Limiting</h3>
+
+      <p>
+        B may only allow a limited number of requests.
+      </p>
+
+      <pre>
+A
+|
+v
+Queue
+|
+| controlled rate
+v
+B
+      </pre>
+
+      <p>
+        This protects both A and B.
+      </p>
+
+    </div>
+
+
+    <div class="card">
+
+      <h3>Backpressure</h3>
+
+      <p>
+        If B can process 100 requests/second but A receives
+        10,000 requests/second, A needs to control the flow.
+      </p>
+
+      <pre>
+10,000 requests/sec
+        |
+        v
+      Queue
+        |
+        | 100/sec
+        v
+        B
+      </pre>
+
+    </div>
+
+
+    <div class="card">
+
+      <h3>Dead Letter Queue</h3>
+
+      <p>
+        Some operations may fail repeatedly.
+      </p>
+
+      <pre>
+Queue
+ |
+ +-- retry
+ |
+ +-- retry
+ |
+ +-- retry
+ |
+ v
+Dead Letter Queue
+ |
+ v
+Manual investigation / recovery
+      </pre>
+
+    </div>
+
+  </section>
+
+
+  <!-- SECURITY -->
+
+  <section id="security">
+
+    <h2>8. Security & External API Problems</h2>
+
+    <h3>Authentication</h3>
+
+    <ul>
+      <li>API keys</li>
+      <li>OAuth tokens</li>
+      <li>Client certificates</li>
+      <li>Credential rotation</li>
+    </ul>
+
+    <h3>Authorization</h3>
+
+    <p>
+      Authentication asks:
+      <strong>"Who are you?"</strong>
+    </p>
+
+    <p>
+      Authorization asks:
+      <strong>"What are you allowed to do?"</strong>
+    </p>
+
+    <h3>Data Protection</h3>
+
+    <ul>
+      <li>Use HTTPS</li>
+      <li>Do not log secrets</li>
+      <li>Do not log sensitive customer information</li>
+      <li>Encrypt sensitive data where appropriate</li>
+    </ul>
+
+  </section>
+
+
+  <!-- API -->
+
+  <section>
+
+    <h2>9. External API Problems</h2>
+
+    <h3>API Version Changes</h3>
+
+    <p>
+      B may change its API.
+    </p>
+
+    <pre>
+Old:
+
+{
+  "orderId": "123",
+  "status": "SUCCESS"
+}
+
+New:
+
+{
+  "id": "123",
+  "state": "COMPLETED"
+}
+    </pre>
+
+    <p>
+      Use an adapter/client layer.
+    </p>
+
+    <pre>
+Service A
+   |
+   v
+ExternalBClient
+   |
+   v
+B API
+    </pre>
+
+    <p>
+      Keep B-specific details isolated from the rest of your application.
+    </p>
+
+
+    <h3>HTTP Success ≠ Business Success</h3>
+
+    <pre>
+HTTP 200
+
+{
+  "status": "FAILED",
+  "reason": "INSUFFICIENT_BALANCE"
+}
+    </pre>
+
+    <p>
+      Always distinguish transport-level success from business-level success.
+    </p>
+
+  </section>
+
+
+  <!-- OBSERVABILITY -->
+
+  <section id="observability">
+
+    <h2>10. Observability</h2>
+
+    <p>
+      When something fails, you need to understand what happened.
+    </p>
+
+    <h3>Correlation ID</h3>
+
+    <pre>
+correlationId = ABC-123
+
+A:
+ABC-123 order created
+
+A:
+ABC-123 calling B
+
+B:
+ABC-123 job created
+
+B:
+ABC-123 processing
+
+B:
+ABC-123 completed
+
+A:
+ABC-123 webhook received
+    </pre>
+
+    <h3>Monitor Business Metrics</h3>
+
+    <ul>
+      <li>Pending orders</li>
+      <li>Processing orders</li>
+      <li>Unknown orders</li>
+      <li>Failed orders</li>
+      <li>B success rate</li>
+      <li>B error rate</li>
+      <li>B latency</li>
+      <li>Retry count</li>
+      <li>Webhook delay</li>
+      <li>Stuck jobs</li>
+    </ul>
+
+  </section>
+
+
+  <!-- RECONCILIATION -->
+
+  <section id="reconciliation">
+
+    <h2>11. Reconciliation</h2>
+
+    <p>
+      Reconciliation is the safety net for distributed integrations.
+    </p>
+
+    <p>
+      Periodically compare what A believes with what B believes.
+    </p>
+
+    <pre>
+A says:
+
+ORDER-123 = PENDING
+
+       vs
+
+B says:
+
+ORDER-123 = SUCCESS
+    </pre>
+
+    <p>
+      Reconciliation updates A:
+    </p>
+
+    <pre>
+ORDER-123 = SUCCESS
+    </pre>
+
+    <div class="success">
+      Even with retries, idempotency, webhooks, and queues,
+      reconciliation is valuable because real systems eventually
+      encounter unexpected failures.
+    </div>
+
+  </section>
+
+
+  <!-- ARCHITECTURE -->
+
+  <section id="architecture">
+
+    <h2>12. Recommended Architecture</h2>
+
+    <pre>
+                           Client
+                             |
+                             v
+                      +--------------+
+                      |  Service A   |
+                      +------+-------+
+                             |
+                +------------+------------+
+                |                         |
+                v                         v
+          +-----------+             +-----------+
+          | A Database|             |  Outbox   |
+          +-----------+             +-----+-----+
+                                           |
+                                           v
+                                        Worker
+                                           |
+                              +------------+------------+
+                              |                         |
+                           Retry                    Rate Limit
+                              |                         |
+                              +------------+------------+
+                                           |
+                                    Circuit Breaker
+                                           |
+                                           v
+                                  +----------------+
+                                  | External B     |
+                                  +-------+--------+
+                                          |
+                                   202 Accepted
+                                          |
+                                          v
+                                      Job ID
+                                          |
+                                  +-------+-------+
+                                  |               |
+                                  v               v
+                               Polling         Webhook
+                                  |               |
+                                  +-------+-------+
+                                          |
+                                          v
+                                      Service A
+                                          |
+                                          v
+                                     A Database
+                                          |
+                                          v
+                                    Reconciliation
+    </pre>
+
+  </section>
+
+
+  <!-- COMPARISON -->
+
+  <section id="comparison">
+
+    <h2>13. Internal A → B vs External A → B</h2>
+
+    <table>
+
+      <thead>
+        <tr>
+          <th>Problem</th>
+          <th>A → Internal B</th>
+          <th>A → External B</th>
+        </tr>
+      </thead>
+
+      <tbody>
+
+        <tr>
+          <td>Network failure</td>
+          <td>Yes</td>
+          <td>Yes, more important</td>
+        </tr>
+
+        <tr>
+          <td>Timeout</td>
+          <td>Yes</td>
+          <td>Yes</td>
+        </tr>
+
+        <tr>
+          <td>Retry</td>
+          <td>Yes</td>
+          <td>Yes</td>
+        </tr>
+
+        <tr>
+          <td>Idempotency</td>
+          <td>Important</td>
+          <td><strong>Extremely important</strong></td>
+        </tr>
+
+        <tr>
+          <td>Distributed transaction</td>
+          <td>Possible problem</td>
+          <td><strong>Cannot normally control it</strong></td>
+        </tr>
+
+        <tr>
+          <td>Consistency</td>
+          <td>Problem</td>
+          <td><strong>Major problem</strong></td>
+        </tr>
+
+        <tr>
+          <td>API changes</td>
+          <td>Can coordinate internally</td>
+          <td><strong>Must handle external changes</strong></td>
+        </tr>
+
+        <tr>
+          <td>Availability</td>
+          <td>Can often control infrastructure</td>
+          <td><strong>Depends on provider</strong></td>
+        </tr>
+
+        <tr>
+          <td>Long-running jobs</td>
+          <td>Can design together</td>
+          <td>Must use provider's job/webhook API</td>
+        </tr>
+
+        <tr>
+          <td>Rate limits</td>
+          <td>Can often control both sides</td>
+          <td><strong>Provider may enforce limits</strong></td>
+        </tr>
+
+        <tr>
+          <td>Reconciliation</td>
+          <td>Useful</td>
+          <td><strong>Very important</strong></td>
+        </tr>
+
+        <tr>
+          <td>Security</td>
+          <td>Internal authentication</td>
+          <td><strong>External authentication + credential management</strong></td>
+        </tr>
+
+      </tbody>
+
+    </table>
+
+  </section>
+
+
+  <!-- CHECKLIST -->
+
+  <section id="checklist">
+
+    <h2>14. Production Checklist</h2>
+
+    <div class="card">
+
+      <h3>Communication</h3>
+
+      <ul>
+        <li>□ Timeout configured</li>
+        <li>□ Retry policy configured</li>
+        <li>□ Exponential backoff</li>
+        <li>□ Jitter</li>
+        <li>□ Circuit breaker</li>
+        <li>□ Rate limiting</li>
+      </ul>
+
+    </div>
+
+
+    <div class="card">
+
+      <h3>Correctness</h3>
+
+      <ul>
+        <li>□ Idempotency key</li>
+        <li>□ Duplicate request handling</li>
+        <li>□ State machine</li>
+        <li>□ UNKNOWN state</li>
+        <li>□ Reconciliation</li>
+        <li>□ Outbox where needed</li>
+      </ul>
+
+    </div>
+
+
+    <div class="card">
+
+      <h3>Long-Running Tasks</h3>
+
+      <ul>
+        <li>□ Async job</li>
+        <li>□ Job ID</li>
+        <li>□ 202 Accepted</li>
+        <li>□ Polling or webhook</li>
+        <li>□ Job timeout</li>
+        <li>□ Stuck-job handling</li>
+      </ul>
+
+    </div>
+
+
+    <div class="card">
+
+      <h3>Operations</h3>
+
+      <ul>
+        <li>□ Logs</li>
+        <li>□ Metrics</li>
+        <li>□ Distributed tracing</li>
+        <li>□ Correlation ID</li>
+        <li>□ Alerts</li>
+        <li>□ Dead Letter Queue</li>
+      </ul>
+
+    </div>
+
+
+    <div class="card">
+
+      <h3>Security</h3>
+
+      <ul>
+        <li>□ HTTPS</li>
+        <li>□ Authentication</li>
+        <li>□ Authorization</li>
+        <li>□ Secret management</li>
+        <li>□ Credential rotation</li>
+        <li>□ Sensitive-data protection</li>
+      </ul>
+
+    </div>
+
+  </section>
+
+
+  <!-- FINAL SUMMARY -->
+
+  <section>
+
+    <h2>15. Final Mental Model</h2>
+
+    <div class="summary">
+
+      <p class="big">
+        The core problem is not HTTP.
+      </p>
+
+      <p>
+        The core problem is that A and B can fail independently.
+      </p>
+
+    </div>
+
+    <pre>
+                 Service A
+                     |
+                     | HTTP
+                     v
+                 Service B
+
+Possible failures:
+
+A fails
+B fails
+Network fails
+Request is lost
+Response is lost
+B succeeds but A doesn't know
+A succeeds but B is never called
+B takes too long
+B processes twice
+B changes its API
+B is overloaded
+B is rate-limited
+B sends duplicate webhook
+B sends webhook late
+Database fails
+Application crashes
+    </pre>
+
+
+    <div class="success">
+
+      <p class="big">
+        The general solution:
+      </p>
+
+      <p>
+        <strong>
+          Make the workflow recoverable.
+        </strong>
+      </p>
+
+      <p>
+        Use:
+      </p>
+
+      <p>
+        <span class="tag">Idempotency</span>
+        <span class="tag">Retry</span>
+        <span class="tag">Timeout</span>
+        <span class="tag">Outbox</span>
+        <span class="tag">Queue</span>
+        <span class="tag">Circuit Breaker</span>
+        <span class="tag">State Machine</span>
+        <span class="tag">Webhook</span>
+        <span class="tag">Polling</span>
+        <span class="tag">Reconciliation</span>
+        <span class="tag">Observability</span>
+      </p>
+
+    </div>
+
+    <h3>The most important idea</h3>
+
+    <div class="warning">
+
+      <p class="big">
+        Don't assume:
+      </p>
+
+      <pre>
+A → B → SUCCESS
+      </pre>
+
+      <p>
+        Instead, design for:
+      </p>
+
+      <pre>
+A
+ |
+ v
+PENDING
+ |
+ v
+PROCESSING
+ |
+ +-------- SUCCESS
+ |
+ +-------- RETRY
+ |
+ +-------- UNKNOWN
+              |
+              v
+        RECONCILIATION
+              |
+        +-----+-----+
+        |           |
+     SUCCESS      FAILED
+      </pre>
+
+    </div>
+
+  </section>
+
+</div>
+</main>
+
+<footer>
+  Service A → Service B — Distributed Systems Study Notes
+</footer>
+
+</body>
+</html>

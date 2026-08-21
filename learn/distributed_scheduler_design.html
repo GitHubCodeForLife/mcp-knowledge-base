@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Designing a Scheduler for Microservices and Distributed Systems</title>
+<style>
+  :root {
+    --bg: #f6f7fb;
+    --card: #ffffff;
+    --text: #1f2937;
+    --muted: #6b7280;
+    --primary: #2563eb;
+    --border: #e5e7eb;
+    --code: #111827;
+    --code-text: #e5e7eb;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.65;
+  }
+  .container {
+    max-width: 1050px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+  }
+  header {
+    background: linear-gradient(135deg, #1d4ed8, #4f46e5);
+    color: white;
+    border-radius: 18px;
+    padding: 42px;
+    margin-bottom: 28px;
+    box-shadow: 0 12px 35px rgba(37, 99, 235, .18);
+  }
+  header h1 { margin: 0 0 12px; font-size: 2.3rem; line-height: 1.2; }
+  header p { margin: 0; opacity: .92; font-size: 1.05rem; }
+  nav, section {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 28px;
+    margin-bottom: 22px;
+  }
+  nav h2 { margin-top: 0; }
+  nav ol { margin-bottom: 0; }
+  a { color: var(--primary); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  h2 { color: #111827; margin-top: 0; font-size: 1.65rem; }
+  h3 { margin-top: 26px; color: #374151; }
+  .callout {
+    border-left: 4px solid var(--primary);
+    background: #eff6ff;
+    padding: 14px 18px;
+    border-radius: 8px;
+    margin: 18px 0;
+  }
+  .warning {
+    border-left-color: #f59e0b;
+    background: #fffbeb;
+  }
+  .diagram {
+    background: var(--code);
+    color: var(--code-text);
+    padding: 20px;
+    border-radius: 10px;
+    overflow-x: auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: .88rem;
+    white-space: pre;
+    line-height: 1.45;
+  }
+  code {
+    background: #eef2ff;
+    padding: 2px 5px;
+    border-radius: 4px;
+    font-family: ui-monospace, monospace;
+  }
+  pre.code {
+    background: var(--code);
+    color: var(--code-text);
+    padding: 18px;
+    border-radius: 10px;
+    overflow-x: auto;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 18px 0;
+  }
+  th, td {
+    text-align: left;
+    padding: 11px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  th { background: #f9fafb; }
+  .badge {
+    display: inline-block;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: #dbeafe;
+    color: #1d4ed8;
+    font-size: .8rem;
+    font-weight: 600;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+  .card {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+    background: #fafafa;
+  }
+  .card h3 { margin-top: 0; }
+  footer {
+    text-align: center;
+    color: var(--muted);
+    padding-top: 12px;
+  }
+  @media (max-width: 700px) {
+    header { padding: 28px 22px; }
+    header h1 { font-size: 1.8rem; }
+    nav, section { padding: 21px; }
+    .grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<header>
+  <h1>Designing a Scheduler for Microservices & Distributed Systems</h1>
+  <p>A practical system-design guide covering scheduling, distributed locking, queues, workers, retries, idempotency, fault tolerance, and observability.</p>
+</header>
+
+<nav>
+  <h2>Contents</h2>
+  <ol>
+    <li><a href="#problem">The Problem</a></li>
+    <li><a href="#distributed">Why Distributed Systems Make Scheduling Hard</a></li>
+    <li><a href="#architecture">High-Level Architecture</a></li>
+    <li><a href="#leader">Leader Election & Distributed Locks</a></li>
+    <li><a href="#queue">Job Queue & Workers</a></li>
+    <li><a href="#state">Job State Machine</a></li>
+    <li><a href="#idempotency">Idempotency & Duplicate Execution</a></li>
+    <li><a href="#retry">Retries & Dead Letter Queue</a></li>
+    <li><a href="#schema">Database Design</a></li>
+    <li><a href="#api">Example API Design</a></li>
+    <li><a href="#failure">Failure Scenarios</a></li>
+    <li><a href="#production">Production Architecture</a></li>
+    <li><a href="#checklist">Design Checklist</a></li>
+  </ol>
+</nav>
+
+<section id="problem">
+  <h2>1. The Problem</h2>
+  <p>A scheduler answers a simple question:</p>
+  <div class="callout"><strong>When should a job run?</strong></div>
+  <p>Examples:</p>
+  <ul>
+    <li>Run a report every day at 00:00.</li>
+    <li>Send a reminder 30 minutes before an appointment.</li>
+    <li>Check expired orders every 5 minutes.</li>
+    <li>Process a cleanup task every Sunday.</li>
+  </ul>
+
+  <p>In a single application, a cron job may be enough:</p>
+
+  <div class="diagram">Cron
+  │
+  ▼
+Application
+  │
+  ▼
+Execute Job</div>
+
+  <p>The problem appears when the application has many instances:</p>
+
+  <div class="diagram">                 Load Balancer
+                 /    |    \
+                /     |     \
+           Server 1 Server 2 Server 3
+              │        │        │
+             Cron     Cron     Cron
+              │        │        │
+              └────────┼────────┘
+                       ▼
+                 Same job runs
+                    3 times!</div>
+
+  <p>In a distributed system, we need coordination and fault tolerance.</p>
+</section>
+
+<section id="distributed">
+  <h2>2. Why Distributed Systems Make Scheduling Hard</h2>
+
+  <p>There are several important failure modes.</p>
+
+  <div class="grid">
+    <div class="card">
+      <h3>Duplicate scheduling</h3>
+      <p>Multiple scheduler instances may decide that the same job is due.</p>
+    </div>
+    <div class="card">
+      <h3>Scheduler crash</h3>
+      <p>The active scheduler can fail while jobs still need to be scheduled.</p>
+    </div>
+    <div class="card">
+      <h3>Worker crash</h3>
+      <p>A worker can process a job and crash before acknowledging completion.</p>
+    </div>
+    <div class="card">
+      <h3>Network failure</h3>
+      <p>A request may time out even though the remote service actually processed it.</p>
+    </div>
+  </div>
+
+  <div class="callout warning">
+    <strong>Key distributed-systems principle:</strong>
+    Assume that failures and duplicate deliveries can happen. Design the system so that these cases are safe.
+  </div>
+</section>
+
+<section id="architecture">
+  <h2>3. High-Level Architecture</h2>
+
+  <p>A clean design separates <strong>scheduling</strong> from <strong>execution</strong>.</p>
+
+  <div class="diagram">                         ┌──────────────────┐
+                         │    Scheduler     │
+                         └────────┬─────────┘
+                                  │
+                           creates due jobs
+                                  │
+                                  ▼
+                         ┌──────────────────┐
+                         │   Job Database   │
+                         └────────┬─────────┘
+                                  │
+                                  ▼
+                         ┌──────────────────┐
+                         │   Message Queue  │
+                         │ Kafka / RabbitMQ │
+                         └────────┬─────────┘
+                                  │
+                    ┌─────────────┼─────────────┐
+                    ▼             ▼             ▼
+                Worker 1      Worker 2      Worker 3
+                    │             │             │
+                    └─────────────┼─────────────┘
+                                  ▼
+                         Business Services</div>
+
+  <h3>Responsibilities</h3>
+  <table>
+    <tr><th>Component</th><th>Responsibility</th></tr>
+    <tr><td>Scheduler</td><td>Determines which jobs are due and publishes execution requests.</td></tr>
+    <tr><td>Database</td><td>Stores schedules, job state, attempts, and execution history.</td></tr>
+    <tr><td>Message Queue</td><td>Buffers jobs and distributes work to workers.</td></tr>
+    <tr><td>Worker</td><td>Executes the actual business operation.</td></tr>
+    <tr><td>DLQ</td><td>Stores jobs that repeatedly fail.</td></tr>
+    <tr><td>Observability</td><td>Provides logs, metrics, tracing, and alerts.</td></tr>
+  </table>
+</section>
+
+<section id="leader">
+  <h2>4. Leader Election & Distributed Locks</h2>
+
+  <p>The scheduler itself should normally be highly available. That means multiple scheduler instances can exist:</p>
+
+  <div class="diagram">Scheduler 1 ─┐
+Scheduler 2 ─┼──► Distributed Lock / Leader Election
+Scheduler 3 ─┘</div>
+
+  <p>Only one instance should actively schedule a particular workload.</p>
+
+  <div class="diagram">Scheduler 1
+    │
+    ├── acquires lease
+    │
+    ▼
+  LEADER
+    │
+    ├── scans schedules
+    ├── creates due jobs
+    └── publishes jobs
+
+Scheduler 2 → STANDBY
+Scheduler 3 → STANDBY</div>
+
+  <p>If the leader crashes and its lease expires, another scheduler can take over.</p>
+
+  <h3>Possible technologies</h3>
+  <ul>
+    <li>Database advisory locks or lease rows</li>
+    <li>Redis-based locks</li>
+    <li>etcd</li>
+    <li>ZooKeeper</li>
+    <li>Kubernetes leader election</li>
+  </ul>
+
+  <div class="callout">
+    Prefer a <strong>lease with an expiration time</strong> rather than a permanent lock. Otherwise a crashed scheduler could leave the system permanently locked.
+  </div>
+</section>
+
+<section id="queue">
+  <h2>5. Job Queue & Workers</h2>
+
+  <p>After determining that a job is due, the scheduler should hand execution to workers through a queue.</p>
+
+  <div class="diagram">Scheduler
+    │
+    │ Job: CHECK_EXPIRED_ORDERS
+    ▼
+Message Queue
+    │
+    ├──────────► Worker 1
+    │
+    ├──────────► Worker 2
+    │
+    └──────────► Worker 3</div>
+
+  <p>Examples of queue technologies include Kafka, RabbitMQ, Amazon SQS, and other managed messaging systems.</p>
+
+  <h3>Example job message</h3>
+  <pre class="code">{
+  "jobId": "job-123",
+  "type": "CHECK_EXPIRED_ORDERS",
+  "scheduledAt": "2026-08-19T10:00:00Z",
+  "attempt": 1
+}</pre>
+
+  <p>The queue provides buffering and allows workers to scale independently.</p>
+</section>
+
+<section id="state">
+  <h2>6. Job State Machine</h2>
+
+  <p>Track job lifecycle explicitly.</p>
+
+  <div class="diagram">                 ┌───────────┐
+                 │ SCHEDULED │
+                 └─────┬─────┘
+                       │
+                       ▼
+                 ┌───────────┐
+                 │  QUEUED   │
+                 └─────┬─────┘
+                       │
+                       ▼
+                 ┌───────────┐
+                 │  RUNNING  │
+                 └─────┬─────┘
+                      / \
+                     /   \
+                    ▼     ▼
+               SUCCESS   FAILED
+                           │
+                           ▼
+                         RETRY
+                           │
+                    ┌──────┴──────┐
+                    │             │
+                    ▼             ▼
+                 SUCCESS         DLQ</div>
+
+  <p>Useful states include:</p>
+  <ul>
+    <li><span class="badge">SCHEDULED</span> Job exists and is waiting for its execution time.</li>
+    <li><span class="badge">QUEUED</span> Job has been published to the queue.</li>
+    <li><span class="badge">RUNNING</span> A worker is processing it.</li>
+    <li><span class="badge">SUCCESS</span> Processing completed successfully.</li>
+    <li><span class="badge">FAILED</span> Processing failed.</li>
+    <li><span class="badge">DLQ</span> Maximum retries were reached.</li>
+  </ul>
+</section>
+
+<section id="idempotency">
+  <h2>7. Idempotency & Duplicate Execution</h2>
+
+  <p>This is one of the most important concepts in distributed job processing.</p>
+
+  <p>Consider this sequence:</p>
+
+  <div class="diagram">Queue
+  │
+  ▼
+Worker
+  │
+  ├── processes job
+  │
+  └── crashes before ACK
+          │
+          ▼
+      Queue redelivers
+          │
+          ▼
+      Worker processes again</div>
+
+  <p>The system must tolerate this.</p>
+
+  <h3>Idempotency</h3>
+
+  <p>An operation is idempotent when repeating the same operation does not create an unintended additional effect.</p>
+
+  <p>One approach is to store an idempotency key:</p>
+
+  <pre class="code">job_id = "job-123"
+
+if already_completed(job_id):
+    return
+
+execute_business_operation()
+
+mark_completed(job_id)</pre>
+
+  <p>A database table might contain:</p>
+
+  <pre class="code">job_execution
+--------------------------------
+job_id        status
+--------------------------------
+job-123       COMPLETED
+job-124       COMPLETED
+job-125       RUNNING</pre>
+
+  <div class="callout">
+    <strong>Important:</strong> A distributed scheduler should not depend on exactly-once execution unless the entire underlying system genuinely provides it. Design for safe duplicate delivery instead.
+  </div>
+</section>
+
+<section id="retry">
+  <h2>8. Retries & Dead Letter Queue</h2>
+
+  <p>Temporary failures should usually be retried.</p>
+
+  <div class="diagram">Attempt 1
+   │
+   └── FAIL
+        │
+        ▼
+      wait 1s
+        │
+        ▼
+Attempt 2
+   │
+   └── FAIL
+        │
+        ▼
+      wait 2s
+        │
+        ▼
+Attempt 3
+   │
+   ├── SUCCESS
+   │
+   └── FAIL
+        │
+        ▼
+       DLQ</div>
+
+  <h3>Exponential backoff</h3>
+  <p>A common retry pattern is:</p>
+
+  <pre class="code">delay = baseDelay × 2^(attempt - 1)</pre>
+
+  <p>Example:</p>
+
+  <table>
+    <tr><th>Attempt</th><th>Delay</th></tr>
+    <tr><td>1</td><td>1 second</td></tr>
+    <tr><td>2</td><td>2 seconds</td></tr>
+    <tr><td>3</td><td>4 seconds</td></tr>
+    <tr><td>4</td><td>8 seconds</td></tr>
+  </table>
+
+  <p>In production, add <strong>jitter</strong> so that many workers do not retry at exactly the same moment.</p>
+
+  <h3>Dead Letter Queue</h3>
+  <p>If a job fails repeatedly, move it to a DLQ for inspection or controlled reprocessing.</p>
+</section>
+
+<section id="schema">
+  <h2>9. Database Design</h2>
+
+  <p>A simple relational model could contain two tables.</p>
+
+  <h3>Schedules</h3>
+  <pre class="code">CREATE TABLE schedules (
+    id              UUID PRIMARY KEY,
+    name            VARCHAR(255) NOT NULL,
+    job_type        VARCHAR(100) NOT NULL,
+    cron_expression VARCHAR(100),
+    next_run_at     TIMESTAMP NOT NULL,
+    enabled         BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at      TIMESTAMP NOT NULL,
+    updated_at      TIMESTAMP NOT NULL
+);</pre>
+
+  <h3>Job Executions</h3>
+  <pre class="code">CREATE TABLE job_executions (
+    id              UUID PRIMARY KEY,
+    schedule_id     UUID NOT NULL,
+    status          VARCHAR(30) NOT NULL,
+    attempt         INTEGER NOT NULL DEFAULT 0,
+    scheduled_at    TIMESTAMP NOT NULL,
+    started_at      TIMESTAMP,
+    completed_at    TIMESTAMP,
+    last_error      TEXT,
+    created_at      TIMESTAMP NOT NULL
+);</pre>
+
+  <p>Useful indexes should be added for queries such as:</p>
+
+  <pre class="code">SELECT *
+FROM schedules
+WHERE enabled = true
+  AND next_run_at <= NOW();</pre>
+</section>
+
+<section id="api">
+  <h2>10. Example API Design</h2>
+
+  <table>
+    <tr><th>Method</th><th>Endpoint</th><th>Purpose</th></tr>
+    <tr><td>POST</td><td>/schedules</td><td>Create a schedule</td></tr>
+    <tr><td>GET</td><td>/schedules</td><td>List schedules</td></tr>
+    <tr><td>GET</td><td>/schedules/{id}</td><td>Get schedule details</td></tr>
+    <tr><td>PATCH</td><td>/schedules/{id}</td><td>Update schedule</td></tr>
+    <tr><td>DELETE</td><td>/schedules/{id}</td><td>Delete schedule</td></tr>
+    <tr><td>POST</td><td>/jobs/{id}/retry</td><td>Manually retry a failed job</td></tr>
+  </table>
+
+  <h3>Create schedule example</h3>
+  <pre class="code">POST /schedules
+
+{
+  "name": "Check expired orders",
+  "jobType": "CHECK_EXPIRED_ORDERS",
+  "cron": "*/5 * * * *"
+}</pre>
+</section>
+
+<section id="failure">
+  <h2>11. Failure Scenarios</h2>
+
+  <table>
+    <tr><th>Failure</th><th>Design response</th></tr>
+    <tr><td>Scheduler crashes</td><td>Another scheduler acquires the lease.</td></tr>
+    <tr><td>Worker crashes</td><td>Queue redelivery / visibility timeout.</td></tr>
+    <tr><td>Network timeout</td><td>Timeout + retry with backoff.</td></tr>
+    <tr><td>Duplicate job</td><td>Idempotency key / execution record.</td></tr>
+    <tr><td>Database unavailable</td><td>Retry carefully and alert.</td></tr>
+    <tr><td>Permanent business error</td><td>Move job to DLQ.</td></tr>
+    <tr><td>Slow job</td><td>Worker lease/heartbeat and timeout policy.</td></tr>
+    <tr><td>Queue overloaded</td><td>Backpressure and worker autoscaling.</td></tr>
+  </table>
+
+  <div class="callout warning">
+    Avoid infinite retries. A permanently broken job can otherwise consume resources forever.
+  </div>
+</section>
+
+<section id="production">
+  <h2>12. Production Architecture</h2>
+
+  <div class="diagram">                         ┌──────────────────────┐
+                         │       API Gateway      │
+                         └──────────┬───────────┘
+                                    │
+                                    ▼
+                         ┌──────────────────────┐
+                         │   Scheduler API      │
+                         └──────────┬───────────┘
+                                    │
+                                    ▼
+                         ┌──────────────────────┐
+                         │    PostgreSQL        │
+                         │ schedules + jobs     │
+                         └──────────┬───────────┘
+                                    │
+                         ┌──────────▼───────────┐
+                         │ Leader Election /    │
+                         │ Distributed Lease    │
+                         └──────────┬───────────┘
+                                    │
+                         ┌──────────▼───────────┐
+                         │ Scheduler Workers    │
+                         │ 1 / 2 / 3            │
+                         └──────────┬───────────┘
+                                    │
+                                    ▼
+                         ┌──────────────────────┐
+                         │ Message Queue        │
+                         │ Kafka / RabbitMQ/SQS │
+                         └──────────┬───────────┘
+                                    │
+                   ┌────────────────┼────────────────┐
+                   ▼                ▼                ▼
+              Job Worker 1     Job Worker 2     Job Worker 3
+                   │                │                │
+                   └────────────────┼────────────────┘
+                                    ▼
+                           Business Services
+
+              ┌─────────────────────────────────────────┐
+              │              Observability              │
+              │ Logs │ Metrics │ Traces │ Alerts       │
+              └─────────────────────────────────────────┘</div>
+
+  <h3>Key design principle</h3>
+  <p>Keep the scheduler responsible for <strong>when</strong> and workers responsible for <strong>how</strong>.</p>
+
+  <p>This allows the execution layer to scale independently from the scheduling layer.</p>
+</section>
+
+<section id="checklist">
+  <h2>13. Design Checklist</h2>
+
+  <ul>
+    <li>□ Can multiple scheduler instances run safely?</li>
+    <li>□ Is leader election or distributed locking implemented?</li>
+    <li>□ Does the lock/lease expire if a scheduler crashes?</li>
+    <li>□ Are schedules persisted in durable storage?</li>
+    <li>□ Are jobs distributed through a durable queue?</li>
+    <li>□ Can workers scale horizontally?</li>
+    <li>□ Is duplicate delivery safe?</li>
+    <li>□ Are operations idempotent?</li>
+    <li>□ Are retries limited?</li>
+    <li>□ Is exponential backoff used?</li>
+    <li>□ Is jitter used for large-scale retries?</li>
+    <li>□ Is there a Dead Letter Queue?</li>
+    <li>□ Are job states and execution history persisted?</li>
+    <li>□ Are timeouts and worker leases defined?</li>
+    <li>□ Are logs, metrics, traces, and alerts available?</li>
+  </ul>
+</section>
+
+<section>
+  <h2>14. Recommended Learning Path</h2>
+
+  <div class="diagram">Monolith
+   │
+   ▼
+Microservices basics
+   │
+   ▼
+Distributed Systems fundamentals
+   │
+   ├── Networking
+   ├── Consistency
+   ├── Failure handling
+   ├── Concurrency
+   └── Distributed locking
+   │
+   ▼
+Message Queues
+   │
+   ├── Kafka
+   ├── RabbitMQ
+   └── SQS
+   │
+   ▼
+Distributed Job Scheduler
+   │
+   ├── Leader election
+   ├── Idempotency
+   ├── Retry
+   ├── DLQ
+   └── Observability
+   │
+   ▼
+Kubernetes
+   │
+   ▼
+Production System Design</div>
+
+  <div class="callout">
+    <strong>Core idea to remember:</strong>
+    A distributed scheduler is not just a cron replacement. It is a coordination system that must remain correct when servers crash, networks fail, messages are duplicated, and work takes longer than expected.
+  </div>
+</section>
+
+<footer>
+  <p>Distributed Scheduler Design — Study Reference</p>
+</footer>
+
+</div>
+</body>
+</html>
