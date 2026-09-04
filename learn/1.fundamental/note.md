@@ -7,7 +7,7 @@ Redis
 Docker
 Loging 
 Configuration: icompara/DRM
-SOFA router
+SOFA router, SOFA Tracer
 ID generation
 
 
